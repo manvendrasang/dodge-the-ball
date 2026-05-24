@@ -1,5 +1,5 @@
 # pylint: disable=missing-module-docstring, missing-function-docstring, global-statement, unused-wildcard-import
-# pylint: disable=missing-class-docstring, no-member, multiple-statements
+# pylint: disable=missing-class-docstring, no-member, multiple-statements, unused-import
 
 import random
 import math
@@ -136,8 +136,6 @@ class PowerUp:
             surface.blit(gs, (cx - gr, cy - gr))
         pygame.draw.circle(surface, self.color, (cx, cy), r)
         pygame.draw.circle(surface, WHITE,      (cx, cy), r, 2)
-        lbl = C.FONT_SMALL.render(PU_LABEL[self.kind], True, DARK)
-        surface.blit(lbl, (cx - lbl.get_width()//2, cy - lbl.get_height()//2))
 
     def player_overlap(self, px, py, p_radius):
         return math.hypot(px - self.x, py - self.y) <= self.RADIUS + p_radius
