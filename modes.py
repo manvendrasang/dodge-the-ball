@@ -10,33 +10,39 @@ from effects import EffectsManager
 from scores import submit_score
 from ui import draw_hud
 
+# pre-allocated glow surface pool for trail (avoids per-frame alloc)
+_TRAIL_SURFS = {}
+def _get_trail_surf(r, alpha):
+    key = (r, alpha)
+    if key not in _TRAIL_SURFS:
+        s = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
+        pygame.draw.circle(s, (255, 255, 255, alpha), (r, r), r)
+        _TRAIL_SURFS[key] = s
+    return _TRAIL_SURFS[key]
+
 
 def _make_ball(score, mode):
-    schedule = BALL_SCHEDULE[mode]
-    # pick base speed from last threshold reached
+    schedule   = BALL_SCHEDULE[mode]
     base_speed = schedule[0][1]
     for threshold, spd in schedule:
         if score >= threshold:
             base_speed = spd
     heavy  = random.random() < HEAVY_CHANCE
     homing = (mode == "hardcore" and
-            score >= HOMING_ACTIVATE_SCORE and
-            random.random() < HOMING_CHANCE)
+              score >= HOMING_ACTIVATE_SCORE and
+              random.random() < HOMING_CHANCE)
     b = Ball(base_speed, homing=homing, heavy=heavy)
     b.set_position_random_edge()
     return b
 
 
-def _should_add_ball(balls, score, mode, schedule_used):
-    max_score = BALL_MAX_SCORE[mode]
-    if score > max_score:
+def _should_add_ball(balls, score, mode):
+    if score > BALL_MAX_SCORE[mode]:
         return False
     schedule = BALL_SCHEDULE[mode]
-    # check fixed schedule
     for i, (threshold, _) in enumerate(schedule):
         if score >= threshold and len(balls) <= i:
             return True
-    # periodic after schedule exhausted
     if len(balls) >= len(schedule):
         expected = len(schedule) + (score - schedule[-1][0]) // PERIODIC_BALL_INTERVAL
         expected = min(expected, len(schedule) + 8)
@@ -46,35 +52,37 @@ def _should_add_ball(balls, score, mode, schedule_used):
 
 
 class GameSession:
-    """Shared state and logic for one play session."""
-    def __init__(self, mode: str, display, clock):
-        self.mode      = mode
-        self.display   = display
-        self.clock     = clock
-        self.score     = 0
-        self.effects   = EffectsManager()
-        self.balls     = []
-        self.target    = Target()
-        self.powerups  = []
-        self.walls     = []
-        self.active_pu = {}  # kind -> frames_remaining
-        self.shield    = False
-        self.lives     = 1 if mode == "hardcore" else 0  # extra life in HC
-        self.dead      = False
-        self.zone_rect = pygame.Rect(0, 0, WIDTH, HEIGHT)
-        self._pu_timer = 5 * FPS  # first powerup appears after ~5s
-        self._wall_timer = WALL_SPAWN_INTERVAL
+    def __init__(self, mode, display, clock):
+        self.mode         = mode
+        self.display      = display
+        self.clock        = clock
+        self.score        = 0
+        self.effects      = EffectsManager()
+        self.balls        = []
+        self.target       = Target()
+        self.powerups     = []
+        self.walls        = []
+        self.active_pu    = {}
+        self.shield       = False
+        self.lives        = 1 if mode == "hardcore" else 0
+        self.dead         = False
+        self.zone_rect    = pygame.Rect(0, 0, WIDTH, HEIGHT)
+        self._pu_timer    = 5 * FPS
+        self._wall_timer  = WALL_SPAWN_INTERVAL
         self._shrink_timer = SHRINK_INTERVAL
-        self._schedule_used = False
-        # spawn first ball
+        # trail: list of (x, y) deques
+        self._trail       = []
         self.balls.append(_make_ball(0, mode))
         self.target.respawn(self.zone_rect if mode == "shrink" else None)
+        # reusable surfaces
+        self._zone_overlay = None
+        self._zone_overlay_rect = None
 
     @property
     def slowmo_active(self):
         return PU_SLOWMO in self.active_pu
 
-    def _apply_slowmo(self, on: bool):
+    def _apply_slowmo(self, on):
         for b in self.balls:
             b.slowmo = on
 
@@ -87,23 +95,20 @@ class GameSession:
             self._apply_slowmo(True)
 
     def update_powerups(self):
-        expired = []
-        for kind in list(self.active_pu):
-            self.active_pu[kind] -= 1
-            if self.active_pu[kind] <= 0:
-                expired.append(kind)
-        for kind in expired:
-            del self.active_pu[kind]
-            if kind == PU_SHIELD:
+        expired = [k for k, v in self.active_pu.items() if v <= 1]
+        for k in expired:
+            del self.active_pu[k]
+            if k == PU_SHIELD:
                 self.shield = False
-            if kind == PU_SLOWMO:
+            if k == PU_SLOWMO:
                 self._apply_slowmo(False)
+        for k in self.active_pu:
+            self.active_pu[k] -= 1
 
     def handle_death(self):
         if self.shield:
             self.shield = False
-            if PU_SHIELD in self.active_pu:
-                del self.active_pu[PU_SHIELD]
+            self.active_pu.pop(PU_SHIELD, None)
             return
         if self.lives > 0:
             self.lives -= 1
@@ -119,6 +124,11 @@ class GameSession:
         ppos = pygame.mouse.get_pos()
         zone = self.zone_rect if self.mode == "shrink" else None
 
+        # update trail
+        self._trail.append(ppos)
+        if len(self._trail) > TRAIL_LEN:
+            self._trail.pop(0)
+
         # update balls
         for b in self.balls:
             b.update_speed(self.score, self.mode)
@@ -128,15 +138,15 @@ class GameSession:
                 if self.dead:
                     return
 
-        # check target
+        # target
         if self.target.player_overlap(*ppos, P_RADIUS):
             mult = 2 if (PU_MULTI30 in self.active_pu or PU_MULTI90 in self.active_pu) else 1
             self.score += 1 * mult
             self.target.respawn(zone)
-            if _should_add_ball(self.balls, self.score, self.mode, self._schedule_used):
+            if _should_add_ball(self.balls, self.score, self.mode):
                 self.balls.append(_make_ball(self.score, self.mode))
 
-        # powerup spawning
+        # powerup spawning (classic + shrink only)
         if self.mode != "hardcore":
             self._pu_timer -= 1
             if self._pu_timer <= 0:
@@ -145,12 +155,11 @@ class GameSession:
                     self.powerups.append(PowerUp(zone))
 
         # powerup collection
-        for pu in self.powerups[:]:
+        for pu in self.powerups:
             if pu.alive and pu.player_overlap(*ppos, P_RADIUS):
                 self.collect_powerup(pu.kind)
                 pu.alive = False
         self.powerups = [p for p in self.powerups if p.alive]
-
         self.update_powerups()
 
         # walls (hardcore)
@@ -176,35 +185,39 @@ class GameSession:
                 self._do_shrink()
 
     def _do_shrink(self):
-        zr = self.zone_rect
+        zr    = self.zone_rect
         new_w = zr.width  - SHRINK_STEP * 2
         new_h = zr.height - SHRINK_STEP * 2
         if new_w < SHRINK_MIN_SIZE or new_h < SHRINK_MIN_SIZE:
             return
-        self.zone_rect = pygame.Rect(
-            zr.x + SHRINK_STEP, zr.y + SHRINK_STEP, new_w, new_h)
+        self.zone_rect = pygame.Rect(zr.x + SHRINK_STEP, zr.y + SHRINK_STEP, new_w, new_h)
+        self._zone_overlay = None  # invalidate cached overlay
         self.effects.trigger_shrink_alert()
-        # push target inside new zone
         if not self.zone_rect.collidepoint(self.target.x, self.target.y):
             self.target.respawn(self.zone_rect)
 
-    def draw(self):
-        ox, oy = self.effects.get_offset()
-        game_surf = pygame.Surface((WIDTH, HEIGHT))
-        game_surf.fill(BG)
-
-        # shrink zone boundary
-        if self.mode == "shrink":
-            pygame.draw.rect(game_surf, (70, 70, 100), self.zone_rect, 3)
-            overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-            for edge_rect in [
+    def _draw_zone_overlay(self, surface):
+        # cache the dark-border overlay; only regenerate on zone change
+        if self._zone_overlay is None:
+            self._zone_overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            self._zone_overlay.fill((0, 0, 0, 0))
+            for r in [
                 pygame.Rect(0, 0, self.zone_rect.left, HEIGHT),
                 pygame.Rect(self.zone_rect.right, 0, WIDTH - self.zone_rect.right, HEIGHT),
                 pygame.Rect(0, 0, WIDTH, self.zone_rect.top),
                 pygame.Rect(0, self.zone_rect.bottom, WIDTH, HEIGHT - self.zone_rect.bottom),
             ]:
-                overlay.fill((0, 0, 0, 80), edge_rect)
-            game_surf.blit(overlay, (0, 0))
+                self._zone_overlay.fill((0, 0, 0, 110), r)
+        surface.blit(self._zone_overlay, (0, 0))
+        pygame.draw.rect(surface, (80, 80, 140), self.zone_rect, 2)
+
+    def draw(self):
+        ox, oy   = self.effects.get_offset()
+        game_surf = pygame.Surface((WIDTH, HEIGHT))
+        game_surf.fill(BG)
+
+        if self.mode == "shrink":
+            self._draw_zone_overlay(game_surf)
 
         for w in self.walls:
             w.draw(game_surf)
@@ -213,17 +226,34 @@ class GameSession:
         for pu in self.powerups:
             pu.draw(game_surf)
         self.target.draw(game_surf)
+
+        # draw trail then player
+        self._draw_trail(game_surf)
         ppos = pygame.mouse.get_pos()
+        # player glow
+        pg_s = pygame.Surface((P_RADIUS*4, P_RADIUS*4), pygame.SRCALPHA)
+        pygame.draw.circle(pg_s, (255, 255, 255, 40), (P_RADIUS*2, P_RADIUS*2), P_RADIUS*2)
+        game_surf.blit(pg_s, (ppos[0] - P_RADIUS*2, ppos[1] - P_RADIUS*2))
         pygame.draw.circle(game_surf, P_COLOR, ppos, P_RADIUS)
+        pygame.draw.circle(game_surf, WHITE,   ppos, P_RADIUS, 1)
 
         lives_arg = self.lives if self.mode == "hardcore" else None
         draw_hud(game_surf, self.score, self.mode, self.active_pu, lives_arg, self.shield)
         self.effects.draw_overlays(game_surf)
         self.display.blit(game_surf, (ox, oy))
 
+    def _draw_trail(self, surface):
+        n = len(self._trail)
+        for i, pos in enumerate(self._trail):
+            # older points = smaller and more transparent
+            frac  = (i + 1) / n
+            r     = max(2, int(P_RADIUS * frac * TRAIL_SHRINK * 1.2))
+            alpha = int(180 * frac * frac)
+            s = _get_trail_surf(r, alpha)
+            surface.blit(s, (pos[0] - r, pos[1] - r))
 
-def run_session(mode: str, display, clock) -> int:
-    """Run one game session; returns final score."""
+
+def run_session(mode, display, clock) -> int:
     pygame.mouse.set_visible(False)
     session = GameSession(mode, display, clock)
     while True:
@@ -238,7 +268,6 @@ def run_session(mode: str, display, clock) -> int:
         session.draw()
         pygame.display.update()
         clock.tick(FPS)
-        # stay in loop until dead AND full shake+flash animation has played out
         if session.dead and session.effects.shake_frames == 0 and session.effects.red_flash == 0:
             break
     pygame.mouse.set_visible(True)
