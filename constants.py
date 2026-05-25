@@ -36,24 +36,28 @@ PU_SLOWMO  = "slowmo"
 PU_SHIELD  = "shield"
 PU_MULTI30 = "multi30"
 PU_MULTI90 = "multi90"
+PU_GHOST   = "ghost"
 
 PU_COLOR = {
     PU_SLOWMO:  CYAN,
     PU_SHIELD:  GREEN,
     PU_MULTI30: YELLOW,
     PU_MULTI90: ORANGE,
+    PU_GHOST:   (200, 200, 255),
 }
 PU_LABEL = {
     PU_SLOWMO:  "SLOW",
     PU_SHIELD:  "SHIELD",
     PU_MULTI30: "x2 30s",
     PU_MULTI90: "x2 90s",
+    PU_GHOST:   "GHOST",
 }
 PU_DURATION = {
     PU_SLOWMO:  8  * FPS,
     PU_SHIELD:  6  * FPS,
     PU_MULTI30: 30 * FPS,
     PU_MULTI90: 90 * FPS,
+    PU_GHOST:   5  * FPS,
 }
 PU_SPAWN_INTERVAL = 15 * FPS
 PU_CHANCE         = 0.45

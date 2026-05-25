@@ -156,7 +156,7 @@ def draw_leaderboard(surface, active_tab_idx):
         surface.blit(sc_txt,   (WIDTH//2 - 200, y))
         surface.blit(ts_txt,   (WIDTH//2 + 20,  y + 4))
         pygame.draw.line(surface, (28, 30, 50),
-                        (WIDTH//2 - 300, y + 34), (WIDTH//2 + 300, y + 34))
+                         (WIDTH//2 - 300, y + 34), (WIDTH//2 + 300, y + 34))
         y += 38
     if not entries:
         empty = C.FONT_HUD.render("No scores recorded yet", True, DIM)
@@ -184,6 +184,10 @@ def draw_hud(surface, score, mode, active_pus, lives=None, shield=False):
     if shield:
         sh = C.FONT_SMALL.render("◈  SHIELD ACTIVE", True, GREEN)
         surface.blit(sh, (WIDTH//2 - sh.get_width()//2, 12))
+    if PU_GHOST in active_pus:
+        gh = C.FONT_SMALL.render("◌  GHOST ACTIVE", True, (200, 200, 255))
+        offset = 32 if shield else 12
+        surface.blit(gh, (WIDTH//2 - gh.get_width()//2, offset))
     px = 14
     for kind, frames_left in active_pus.items():
         secs = max(0, frames_left // FPS)

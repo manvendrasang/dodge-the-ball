@@ -118,7 +118,7 @@ class PowerUp:
         m = self.RADIUS + 20
         self.x     = random.randint(bounds.left + m, bounds.right  - m)
         self.y     = random.randint(bounds.top  + m, bounds.bottom - m)
-        self.kind  = random.choice([PU_SLOWMO, PU_SHIELD, PU_MULTI30, PU_MULTI90])
+        self.kind  = random.choice([PU_SLOWMO, PU_SHIELD, PU_MULTI30, PU_MULTI90, PU_GHOST])
         self.color = PU_COLOR[self.kind]
         self.alive = True
         self._pulse = 0

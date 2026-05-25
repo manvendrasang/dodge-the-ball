@@ -1,5 +1,5 @@
 # pylint: disable=missing-module-docstring, missing-function-docstring, global-statement, unused-wildcard-import
-# pylint: disable=missing-class-docstring, no-member, unused-import, unused-argument
+# pylint: disable=missing-class-docstring, no-member, unused-import, unused-argument, unused-variable
 
 import random
 import math
@@ -82,6 +82,10 @@ class GameSession:
     def slowmo_active(self):
         return PU_SLOWMO in self.active_pu
 
+    @property
+    def ghost_active(self):
+        return PU_GHOST in self.active_pu
+
     def _apply_slowmo(self, on):
         for b in self.balls:
             b.slowmo = on
@@ -133,7 +137,7 @@ class GameSession:
         for b in self.balls:
             b.update_speed(self.score, self.mode)
             b.move(ppos, zone)
-            if b.collides_with_player(*ppos, P_RADIUS):
+            if not self.ghost_active and b.collides_with_player(*ppos, P_RADIUS):
                 self.handle_death()
                 if self.dead:
                     return
@@ -230,12 +234,30 @@ class GameSession:
         # draw trail then player
         self._draw_trail(game_surf)
         ppos = pygame.mouse.get_pos()
-        # player glow
-        pg_s = pygame.Surface((P_RADIUS*4, P_RADIUS*4), pygame.SRCALPHA)
-        pygame.draw.circle(pg_s, (255, 255, 255, 40), (P_RADIUS*2, P_RADIUS*2), P_RADIUS*2)
-        game_surf.blit(pg_s, (ppos[0] - P_RADIUS*2, ppos[1] - P_RADIUS*2))
-        pygame.draw.circle(game_surf, P_COLOR, ppos, P_RADIUS)
-        pygame.draw.circle(game_surf, WHITE,   ppos, P_RADIUS, 1)
+        if self.ghost_active:
+            frames_left = self.active_pu.get(PU_GHOST, 0)
+            pulse = abs(math.sin(pygame.time.get_ticks() * 0.008))
+            # outer halo
+            halo_r = int(P_RADIUS * 2.5 + pulse * 6)
+            halo_s = pygame.Surface((halo_r*2, halo_r*2), pygame.SRCALPHA)
+            pygame.draw.circle(halo_s, (200, 200, 255, int(50 + pulse * 60)),
+                               (halo_r, halo_r), halo_r)
+            game_surf.blit(halo_s, (ppos[0] - halo_r, ppos[1] - halo_r))
+            # translucent player body
+            ghost_s = pygame.Surface((P_RADIUS*2+2, P_RADIUS*2+2), pygame.SRCALPHA)
+            alpha = int(80 + pulse * 80)
+            pygame.draw.circle(ghost_s, (220, 220, 255, alpha),
+                               (P_RADIUS+1, P_RADIUS+1), P_RADIUS)
+            pygame.draw.circle(ghost_s, (255, 255, 255, alpha),
+                               (P_RADIUS+1, P_RADIUS+1), P_RADIUS, 1)
+            game_surf.blit(ghost_s, (ppos[0] - P_RADIUS - 1, ppos[1] - P_RADIUS - 1))
+        else:
+            # normal player glow + body
+            pg_s = pygame.Surface((P_RADIUS*4, P_RADIUS*4), pygame.SRCALPHA)
+            pygame.draw.circle(pg_s, (255, 255, 255, 40), (P_RADIUS*2, P_RADIUS*2), P_RADIUS*2)
+            game_surf.blit(pg_s, (ppos[0] - P_RADIUS*2, ppos[1] - P_RADIUS*2))
+            pygame.draw.circle(game_surf, P_COLOR, ppos, P_RADIUS)
+            pygame.draw.circle(game_surf, WHITE,   ppos, P_RADIUS, 1)
 
         lives_arg = self.lives if self.mode == "hardcore" else None
         draw_hud(game_surf, self.score, self.mode, self.active_pu, lives_arg, self.shield)
