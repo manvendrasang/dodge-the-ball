@@ -79,11 +79,12 @@ class Ball:
 
 class Target:
     def __init__(self):
-        self.w = 20
-        self.h = 20
-        self.x = WIDTH  // 2
-        self.y = HEIGHT // 2
+        self.w     = 20
+        self.h     = 20
+        self.x     = WIDTH  // 2
+        self.y     = HEIGHT // 2
         self.color = random.choice(BALL_COLORS)
+        self._pulse = random.randint(0, 360)  # stagger so all targets don't sync
 
     def respawn(self, zone_rect=None):
         bounds = zone_rect if zone_rect else pygame.Rect(0, 0, WIDTH, HEIGHT)
@@ -91,16 +92,32 @@ class Target:
         self.x = random.randint(bounds.left + margin, bounds.right  - margin)
         self.y = random.randint(bounds.top  + margin, bounds.bottom - margin)
         self.color = random.choice(BALL_COLORS)
+        self._pulse = random.randint(0, 360)
+
+    def update(self):
+        self._pulse = (self._pulse + 3) % 360
 
     def draw(self, surface):
+        self._pulse = (self._pulse + 3) % 360
+        breath = (math.sin(math.radians(self._pulse)) + 1) / 2  # 0..1
         cx, cy = self.x + self.w//2, self.y + self.h//2
-        # glow
-        gr = self.w + 8
-        gs = pygame.Surface((gr*2, gr*2), pygame.SRCALPHA)
-        pygame.draw.rect(gs, (*self.color, 50), (0, 0, gr*2, gr*2), border_radius=4)
-        surface.blit(gs, (cx - gr, cy - gr))
-        pygame.draw.rect(surface, self.color, (self.x, self.y, self.w, self.h), border_radius=3)
-        pygame.draw.rect(surface, WHITE,      (self.x, self.y, self.w, self.h), 2, border_radius=3)
+        # outer glow breathes in size and alpha
+        glow_r  = int((self.w + 6) + breath * 10)
+        glow_a  = int(30 + breath * 90)
+        gs = pygame.Surface((glow_r*2, glow_r*2), pygame.SRCALPHA)
+        pygame.draw.rect(gs, (*self.color, glow_a),
+                        (0, 0, glow_r*2, glow_r*2), border_radius=6)
+        surface.blit(gs, (cx - glow_r, cy - glow_r))
+        # inner fill brightens on peak
+        bright = tuple(min(255, int(v + breath * 60)) for v in self.color)
+        pygame.draw.rect(surface, bright,
+                        (self.x, self.y, self.w, self.h), border_radius=3)
+        # border alpha also pulses
+        border_a = int(160 + breath * 95)
+        border_s = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
+        pygame.draw.rect(border_s, (255, 255, 255, border_a),
+                        (0, 0, self.w, self.h), 2, border_radius=3)
+        surface.blit(border_s, (self.x, self.y))
 
     def player_overlap(self, px, py, p_radius):
         cx = self.x + self.w / 2

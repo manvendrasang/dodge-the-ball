@@ -156,7 +156,7 @@ def draw_leaderboard(surface, active_tab_idx):
         surface.blit(sc_txt,   (WIDTH//2 - 200, y))
         surface.blit(ts_txt,   (WIDTH//2 + 20,  y + 4))
         pygame.draw.line(surface, (28, 30, 50),
-                         (WIDTH//2 - 300, y + 34), (WIDTH//2 + 300, y + 34))
+                        (WIDTH//2 - 300, y + 34), (WIDTH//2 + 300, y + 34))
         y += 38
     if not entries:
         empty = C.FONT_HUD.render("No scores recorded yet", True, DIM)
