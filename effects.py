@@ -49,13 +49,13 @@ class EffectsManager:
         # red death flash
         if self.red_flash > 0:
             alpha = int(160 * self.red_flash / 40)
-            overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            overlay = pygame.Surface((C.WIDTH, C.HEIGHT), pygame.SRCALPHA)
             overlay.fill((200, 20, 20, alpha))
             surface.blit(overlay, (0, 0))
         # powerup glow
         if self.glow_frames > 0 and self.glow_color:
             alpha = int(90 * self.glow_frames / 45)
-            overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            overlay = pygame.Surface((C.WIDTH, C.HEIGHT), pygame.SRCALPHA)
             overlay.fill((*self.glow_color, alpha))
             surface.blit(overlay, (0, 0))
         # shrink zone alert
@@ -63,4 +63,4 @@ class EffectsManager:
             alpha = min(255, self.alert_frames * 5)
             lbl = C.FONT_BIG.render(self.alert_text, True, (255, 80, 80))
             lbl.set_alpha(alpha)
-            surface.blit(lbl, (WIDTH//2 - lbl.get_width()//2, HEIGHT//2 - 40))
+            surface.blit(lbl, (C.WIDTH//2 - lbl.get_width()//2, C.HEIGHT//2 - 40))

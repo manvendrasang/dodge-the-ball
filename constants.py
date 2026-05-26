@@ -2,10 +2,15 @@
 
 import pygame
 
-# window
+# window - updated at runtime by set_resolution()
 WIDTH, HEIGHT = 1100, 680
-FPS = 60
+FPS   = 60
 MODES = ["classic", "shrink", "hardcore"]
+
+def set_resolution(w, h):
+    """Called once after pygame.init() with the actual display size."""
+    global WIDTH, HEIGHT
+    WIDTH, HEIGHT = w, h
 
 # theme colors - high contrast dark neon
 BG        = (10,  12,  20)   # near-black blue-tinted

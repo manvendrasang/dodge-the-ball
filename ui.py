@@ -39,23 +39,18 @@ def _panel(surface, rect, alpha=180):
 
 
 def draw_main_menu(surface):
-    surface.fill(BG)
-    # subtle grid lines for depth
-    for x in range(0, WIDTH, 60):
-        pygame.draw.line(surface, (20, 22, 36), (x, 0), (x, HEIGHT))
-    for y in range(0, HEIGHT, 60):
-        pygame.draw.line(surface, (20, 22, 36), (0, y), (WIDTH, y))
+    # background + grid drawn by MenuAnimator in main.py before this call
     # title
     title = C.FONT_TITLE.render("DODGE THE BALL", True, CYAN)
     # glow behind title
     glow = C.FONT_TITLE.render("DODGE THE BALL", True, (0, 80, 100))
     for off in [(-2,2),(2,2),(-2,-2),(2,-2)]:
-        surface.blit(glow, (WIDTH//2 - title.get_width()//2 + off[0], 72 + off[1]))
-    surface.blit(title, (WIDTH//2 - title.get_width()//2, 72))
+        surface.blit(glow, (C.WIDTH//2 - title.get_width()//2 + off[0], 72 + off[1]))
+    surface.blit(title, (C.WIDTH//2 - title.get_width()//2, 72))
     sub = C.FONT_HUD.render("SELECT GAME MODE", True, DIM)
-    surface.blit(sub, (WIDTH//2 - sub.get_width()//2, 178))
+    surface.blit(sub, (C.WIDTH//2 - sub.get_width()//2, 178))
     bw, bh, gap = 300, 52, 14
-    cx = WIDTH//2 - bw//2
+    cx = C.WIDTH//2 - bw//2
     y0 = 220
     buttons = [
         Button((cx, y0,           bw, bh), "Classic",     (20,60,120),  (40,130,255),  WHITE),
@@ -67,7 +62,7 @@ def draw_main_menu(surface):
     for b in buttons:
         b.draw(surface)
     # personal bests panel
-    pb_x = WIDTH - 230
+    pb_x = C.WIDTH - 230
     _panel(surface, pygame.Rect(pb_x - 10, 218, 220, 100))
     pb_title = C.FONT_SMALL.render("PERSONAL BESTS", True, DIM)
     surface.blit(pb_title, (pb_x, 224))
@@ -81,26 +76,26 @@ def draw_main_menu(surface):
 
 def draw_game_over(surface, score, mode):
     surface.fill(BG)
-    for x in range(0, WIDTH, 60):
-        pygame.draw.line(surface, (20, 22, 36), (x, 0), (x, HEIGHT))
-    for y in range(0, HEIGHT, 60):
-        pygame.draw.line(surface, (20, 22, 36), (0, y), (WIDTH, y))
+    for x in range(0, C.WIDTH, 60):
+        pygame.draw.line(surface, (20, 22, 36), (x, 0), (x, C.HEIGHT))
+    for y in range(0, C.HEIGHT, 60):
+        pygame.draw.line(surface, (20, 22, 36), (0, y), (C.WIDTH, y))
     # panel
     pw, ph = 500, 360
-    _panel(surface, pygame.Rect(WIDTH//2 - pw//2, 100, pw, ph), 210)
+    _panel(surface, pygame.Rect(C.WIDTH//2 - pw//2, 100, pw, ph), 210)
     t = C.FONT_TITLE.render("GAME OVER", True, RED)
     glow = C.FONT_TITLE.render("GAME OVER", True, (80, 10, 10))
     for off in [(-2,2),(2,2),(-2,-2),(2,-2)]:
-        surface.blit(glow, (WIDTH//2 - t.get_width()//2 + off[0], 118 + off[1]))
-    surface.blit(t, (WIDTH//2 - t.get_width()//2, 118))
+        surface.blit(glow, (C.WIDTH//2 - t.get_width()//2 + off[0], 118 + off[1]))
+    surface.blit(t, (C.WIDTH//2 - t.get_width()//2, 118))
     s = C.FONT_BIG.render(f"Score: {score}", True, WHITE)
-    surface.blit(s, (WIDTH//2 - s.get_width()//2, 232))
+    surface.blit(s, (C.WIDTH//2 - s.get_width()//2, 232))
     pb = get_personal_best(mode)
     if score >= pb and score > 0:
         hi = C.FONT_HUD.render("★  NEW PERSONAL BEST  ★", True, YELLOW)
-        surface.blit(hi, (WIDTH//2 - hi.get_width()//2, 295))
+        surface.blit(hi, (C.WIDTH//2 - hi.get_width()//2, 295))
     bw, bh, gap = 260, 50, 12
-    cx = WIDTH//2 - bw//2
+    cx = C.WIDTH//2 - bw//2
     buttons = [
         Button((cx, 370, bw, bh), "[R]  Restart", (20,80,30),  GREEN,  WHITE),
         Button((cx, 370+bh+gap, bw, bh), "[M]  Menu",    (20,50,100), BLUE,   WHITE),
@@ -113,31 +108,31 @@ def draw_game_over(surface, score, mode):
 
 def draw_leaderboard(surface, active_tab_idx):
     surface.fill(BG)
-    for x in range(0, WIDTH, 60):
-        pygame.draw.line(surface, (20, 22, 36), (x, 0), (x, HEIGHT))
-    for y in range(0, HEIGHT, 60):
-        pygame.draw.line(surface, (20, 22, 36), (0, y), (WIDTH, y))
+    for x in range(0, C.WIDTH, 60):
+        pygame.draw.line(surface, (20, 22, 36), (x, 0), (x, C.HEIGHT))
+    for y in range(0, C.HEIGHT, 60):
+        pygame.draw.line(surface, (20, 22, 36), (0, y), (C.WIDTH, y))
     t = C.FONT_BIG.render("LEADERBOARD", True, CYAN)
-    surface.blit(t, (WIDTH//2 - t.get_width()//2, 24))
+    surface.blit(t, (C.WIDTH//2 - t.get_width()//2, 24))
     tab_labels = ["Classic", "Shrink Zone", "Hardcore"]
     tab_fg     = [CYAN, PURPLE, RED]
     tab_bg     = [(20,60,120), (50,20,90), (90,20,20)]
     tab_w, tab_h = 210, 44
-    tab_start = WIDTH//2 - (len(tab_labels)*(tab_w+10)-10)//2
+    tab_start = C.WIDTH//2 - (len(tab_labels)*(tab_w+10)-10)//2
     tab_buttons = []
     for i, (lbl, fg, bg) in enumerate(zip(tab_labels, tab_fg, tab_bg)):
         tx = tab_start + i*(tab_w+10)
-        active = i == active_tab_idx
+        active = (i == active_tab_idx)
         b = Button((tx, 86, tab_w, tab_h), lbl,
-                fg if active else bg,
-                fg,
-                DARK if active else WHITE)
+                   fg if active else bg,
+                   fg,
+                   DARK if active else WHITE)
         b.draw(surface)
         tab_buttons.append(b)
     mode    = MODES[active_tab_idx]
     entries = get_scores(mode)
     # entries are now (score, timestamp) tuples or plain ints for backward compat
-    _panel(surface, pygame.Rect(WIDTH//2 - 320, 148, 640, HEIGHT - 220))
+    _panel(surface, pygame.Rect(C.WIDTH//2 - 320, 148, 640, C.HEIGHT - 220))
     y = 164
     for rank, entry in enumerate(entries, 1):
         if isinstance(entry, (list, tuple)):
@@ -152,16 +147,16 @@ def draw_leaderboard(surface, active_tab_idx):
         rank_txt = C.FONT_HUD.render(f"#{rank:>2}", True, col)
         sc_txt   = C.FONT_HUD.render(str(sc), True, WHITE)
         ts_txt   = C.FONT_SMALL.render(ts, True, (80, 84, 110))
-        surface.blit(rank_txt, (WIDTH//2 - 280, y))
-        surface.blit(sc_txt,   (WIDTH//2 - 200, y))
-        surface.blit(ts_txt,   (WIDTH//2 + 20,  y + 4))
+        surface.blit(rank_txt, (C.WIDTH//2 - 280, y))
+        surface.blit(sc_txt,   (C.WIDTH//2 - 200, y))
+        surface.blit(ts_txt,   (C.WIDTH//2 + 20,  y + 4))
         pygame.draw.line(surface, (28, 30, 50),
-                        (WIDTH//2 - 300, y + 34), (WIDTH//2 + 300, y + 34))
+                         (C.WIDTH//2 - 300, y + 34), (C.WIDTH//2 + 300, y + 34))
         y += 38
     if not entries:
         empty = C.FONT_HUD.render("No scores recorded yet", True, DIM)
-        surface.blit(empty, (WIDTH//2 - empty.get_width()//2, 280))
-    bk = Button((WIDTH//2 - 120, HEIGHT - 62, 240, 46),
+        surface.blit(empty, (C.WIDTH//2 - empty.get_width()//2, 280))
+    bk = Button((C.WIDTH//2 - 120, C.HEIGHT - 62, 240, 46),
                 "Back to Menu", (30,34,70), BTN_LEADER_H, CYAN)
     bk.draw(surface)
     return [bk], tab_buttons
@@ -177,20 +172,47 @@ def draw_hud(surface, score, mode, active_pus, lives=None, shield=False):
         "classic": CYAN, "shrink": PURPLE, "hardcore": RED
     }.get(mode, WHITE)
     mode_txt = C.FONT_SMALL.render(mode.upper(), True, mode_col)
-    surface.blit(mode_txt, (WIDTH - mode_txt.get_width() - 14, 12))
+    surface.blit(mode_txt, (C.WIDTH - mode_txt.get_width() - 14, 12))
     if lives is not None:
         lv_txt = C.FONT_HUD.render(f"{'♥' * (lives+1)}", True, RED)
-        surface.blit(lv_txt, (WIDTH - lv_txt.get_width() - 14, 38))
+        surface.blit(lv_txt, (C.WIDTH - lv_txt.get_width() - 14, 38))
     if shield:
         sh = C.FONT_SMALL.render("◈  SHIELD ACTIVE", True, GREEN)
-        surface.blit(sh, (WIDTH//2 - sh.get_width()//2, 12))
+        surface.blit(sh, (C.WIDTH//2 - sh.get_width()//2, 12))
     if PU_GHOST in active_pus:
         gh = C.FONT_SMALL.render("◌  GHOST ACTIVE", True, (200, 200, 255))
         offset = 32 if shield else 12
-        surface.blit(gh, (WIDTH//2 - gh.get_width()//2, offset))
+        surface.blit(gh, (C.WIDTH//2 - gh.get_width()//2, offset))
     px = 14
     for kind, frames_left in active_pus.items():
         secs = max(0, frames_left // FPS)
         lbl  = C.FONT_SMALL.render(f"{PU_LABEL[kind]}  {secs}s", True, PU_COLOR[kind])
-        surface.blit(lbl, (px, HEIGHT - 30))
+        surface.blit(lbl, (px, C.HEIGHT - 30))
         px += lbl.get_width() + 24
+
+
+def draw_pause(surface) -> list:
+    """Semi-transparent pause overlay. Returns list of Buttons."""
+    overlay = pygame.Surface((C.WIDTH, C.HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 160))
+    surface.blit(overlay, (0, 0))
+    # panel
+    pw, ph = 420, 340
+    px_, py_ = C.WIDTH//2 - pw//2, C.HEIGHT//2 - ph//2
+    _panel(surface, pygame.Rect(px_, py_, pw, ph), 230)
+    t = C.FONT_BIG.render("PAUSED", True, CYAN)
+    surface.blit(t, (C.WIDTH//2 - t.get_width()//2, py_ + 28))
+    hint = C.FONT_SMALL.render("ESC / P  to resume", True, DIM)
+    surface.blit(hint, (C.WIDTH//2 - hint.get_width()//2, py_ + 88))
+    bw, bh, gap = 280, 48, 10
+    cx = C.WIDTH//2 - bw//2
+    y0 = py_ + 138
+    buttons = [
+        Button((cx, y0,             bw, bh), "Resume",   (20,80,30),  GREEN,      WHITE),
+        Button((cx, y0+bh+gap,      bw, bh), "Restart",  (20,60,120), BLUE,       WHITE),
+        Button((cx, y0+(bh+gap)*2,  bw, bh), "Menu",     (30,34,70),  BTN_LEADER_H, CYAN),
+        Button((cx, y0+(bh+gap)*3,  bw, bh), "Quit",     BTN_QUIT,    BTN_QUIT_H, RED),
+    ]
+    for b in buttons:
+        b.draw(surface)
+    return buttons

@@ -1,14 +1,15 @@
 # pylint: disable=missing-module-docstring, missing-function-docstring, global-statement, unused-wildcard-import
-# pylint: disable=missing-class-docstring, no-member, unused-import, unused-argument, unused-variable
+# pylint: disable=missing-class-docstring, no-member, unused-import, unused-argument, unused-variable, multiple-statements
 
 import random
 import math
 import pygame
+import constants as C
 from constants import *
 from entities import Ball, Target, PowerUp, Wall
 from effects import EffectsManager
 from scores import submit_score
-from ui import draw_hud
+from ui import draw_hud, draw_pause
 
 # pre-allocated glow surface pool for trail (avoids per-frame alloc)
 _TRAIL_SURFS = {}
@@ -29,8 +30,8 @@ def _make_ball(score, mode):
             base_speed = spd
     heavy  = random.random() < HEAVY_CHANCE
     homing = (mode == "hardcore" and
-            score >= HOMING_ACTIVATE_SCORE and
-            random.random() < HOMING_CHANCE)
+              score >= HOMING_ACTIVATE_SCORE and
+              random.random() < HOMING_CHANCE)
     b = Ball(base_speed, homing=homing, heavy=heavy)
     b.set_position_random_edge()
     return b
@@ -66,7 +67,7 @@ class GameSession:
         self.shield       = False
         self.lives        = 1 if mode == "hardcore" else 0
         self.dead         = False
-        self.zone_rect    = pygame.Rect(0, 0, WIDTH, HEIGHT)
+        self.zone_rect    = pygame.Rect(0, 0, C.WIDTH, C.HEIGHT)
         self._pu_timer    = 5 * FPS
         self._wall_timer  = WALL_SPAWN_INTERVAL
         self._shrink_timer = SHRINK_INTERVAL
@@ -203,13 +204,13 @@ class GameSession:
     def _draw_zone_overlay(self, surface):
         # cache the dark-border overlay; only regenerate on zone change
         if self._zone_overlay is None:
-            self._zone_overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            self._zone_overlay = pygame.Surface((C.WIDTH, C.HEIGHT), pygame.SRCALPHA)
             self._zone_overlay.fill((0, 0, 0, 0))
             for r in [
-                pygame.Rect(0, 0, self.zone_rect.left, HEIGHT),
-                pygame.Rect(self.zone_rect.right, 0, WIDTH - self.zone_rect.right, HEIGHT),
-                pygame.Rect(0, 0, WIDTH, self.zone_rect.top),
-                pygame.Rect(0, self.zone_rect.bottom, WIDTH, HEIGHT - self.zone_rect.bottom),
+                pygame.Rect(0, 0, self.zone_rect.left, C.HEIGHT),
+                pygame.Rect(self.zone_rect.right, 0, C.WIDTH - self.zone_rect.right, C.HEIGHT),
+                pygame.Rect(0, 0, C.WIDTH, self.zone_rect.top),
+                pygame.Rect(0, self.zone_rect.bottom, C.WIDTH, C.HEIGHT - self.zone_rect.bottom),
             ]:
                 self._zone_overlay.fill((0, 0, 0, 110), r)
         surface.blit(self._zone_overlay, (0, 0))
@@ -217,7 +218,7 @@ class GameSession:
 
     def draw(self):
         ox, oy   = self.effects.get_offset()
-        game_surf = pygame.Surface((WIDTH, HEIGHT))
+        game_surf = pygame.Surface((C.WIDTH, C.HEIGHT))
         game_surf.fill(BG)
 
         if self.mode == "shrink":
@@ -247,9 +248,9 @@ class GameSession:
             ghost_s = pygame.Surface((P_RADIUS*2+2, P_RADIUS*2+2), pygame.SRCALPHA)
             alpha = int(80 + pulse * 80)
             pygame.draw.circle(ghost_s, (220, 220, 255, alpha),
-                            (P_RADIUS+1, P_RADIUS+1), P_RADIUS)
+                               (P_RADIUS+1, P_RADIUS+1), P_RADIUS)
             pygame.draw.circle(ghost_s, (255, 255, 255, alpha),
-                            (P_RADIUS+1, P_RADIUS+1), P_RADIUS, 1)
+                               (P_RADIUS+1, P_RADIUS+1), P_RADIUS, 1)
             game_surf.blit(ghost_s, (ppos[0] - P_RADIUS - 1, ppos[1] - P_RADIUS - 1))
         else:
             # normal player glow + body
@@ -293,14 +294,40 @@ class GameSession:
 def run_session(mode, display, clock) -> int:
     pygame.mouse.set_visible(False)
     session = GameSession(mode, display, clock)
+    paused  = False
     while True:
-        for event in pygame.event.get():
+        ev_list = pygame.event.get()
+        for event in ev_list:
             if event.type == pygame.QUIT:
-                pygame.quit()
-                raise SystemExit
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
-                pygame.quit()
-                raise SystemExit
+                pygame.quit(); raise SystemExit
+            if event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_ESCAPE, pygame.K_p) and not session.dead:
+                    paused = not paused
+                    pygame.mouse.set_visible(paused)
+                if event.key == pygame.K_q and not paused:
+                    pygame.quit(); raise SystemExit
+        if paused:
+            pause_buttons = draw_pause(display)
+            for event in ev_list:
+                for btn in pause_buttons:
+                    if btn.clicked(event):
+                        lbl = btn.label.lower()
+                        if lbl == "resume":
+                            paused = False
+                            pygame.mouse.set_visible(False)
+                        elif lbl == "restart":
+                            pygame.mouse.set_visible(False)
+                            pygame.event.clear()
+                            return run_session(mode, display, clock)
+                        elif lbl == "menu":
+                            pygame.mouse.set_visible(True)
+                            submit_score(mode, session.score)
+                            return -1  # sentinel: caller goes to menu
+                        elif lbl == "quit":
+                            pygame.quit(); raise SystemExit
+            pygame.display.update()
+            clock.tick(FPS)
+            continue
         session.update()
         session.draw()
         pygame.display.update()
