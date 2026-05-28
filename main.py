@@ -8,7 +8,6 @@ from constants import init_fonts, set_resolution, MODES, FPS
 from ui import draw_main_menu, draw_game_over, draw_leaderboard
 from modes import run_session
 from menu_anim import MenuAnimator
-<<<<<<< HEAD
 from audio import get_audio
 
 pygame.init()
@@ -17,35 +16,16 @@ SW, SH = info.current_w, info.current_h
 display = pygame.display.set_mode((SW, SH), pygame.FULLSCREEN)
 pygame.display.set_caption("Dodge The Ball!")
 clock   = pygame.time.Clock()
-=======
-
-pygame.init()
-
-# fullscreen using actual display resolution
-info = pygame.display.Info()
-SW, SH = info.current_w, info.current_h
-display = pygame.display.set_mode((SW, SH), pygame.FULLSCREEN)
-pygame.display.set_caption("Dodge The Ball!")
-clock = pygame.time.Clock()
-
-# update constants so all modules use actual screen size
->>>>>>> cf68046735a284701a41fb7030771249e7086ddc
 set_resolution(SW, SH)
 init_fonts()
-
-# reload ui/modes/entities after resolution is set
-# (they already imported constants by ref via C.WIDTH etc so dynamic reads are fine)
 
 state        = "menu"
 current_mode = "classic"
 last_score   = 0
 lb_tab       = 0
 animator     = MenuAnimator()
-<<<<<<< HEAD
 audio        = get_audio()  # kicks off background synthesis thread
 _music_on    = False
-=======
->>>>>>> cf68046735a284701a41fb7030771249e7086ddc
 
 while True:
     ev_list = []
@@ -55,12 +35,9 @@ while True:
         ev_list.append(e)
 
     if state == "menu":
-<<<<<<< HEAD
         if not _music_on:
             audio.start_music()
             _music_on = True
-=======
->>>>>>> cf68046735a284701a41fb7030771249e7086ddc
         animator.update()
         display.fill(C.BG)
         animator.draw(display)
@@ -84,10 +61,6 @@ while True:
     elif state == "game":
         last_score = run_session(current_mode, display, clock)
         pygame.event.clear()
-<<<<<<< HEAD
-=======
-        # -1 sentinel means player chose Menu from pause screen
->>>>>>> cf68046735a284701a41fb7030771249e7086ddc
         if last_score == -1:
             state = "menu"
         else:

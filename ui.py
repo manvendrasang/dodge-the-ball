@@ -126,7 +126,7 @@ def draw_leaderboard(surface, active_tab_idx):
     tab_buttons = []
     for i, (lbl, fg, bg) in enumerate(zip(tab_labels, tab_fg, tab_bg)):
         tx = tab_start + i*(tab_w+10)
-        active = (i == active_tab_idx)
+        active = i == active_tab_idx
         b = Button((tx, 86, tab_w, tab_h), lbl,
                    fg if active else bg,
                    fg,

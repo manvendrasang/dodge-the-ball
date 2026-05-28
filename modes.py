@@ -9,7 +9,8 @@ from constants import *
 from entities import Ball, Target, PowerUp, Wall
 from effects import EffectsManager
 from scores import submit_score
-from ui import draw_hud
+from ui import draw_hud, draw_pause
+from audio import get_audio
 
 # pre-allocated glow surface pool for trail (avoids per-frame alloc)
 _TRAIL_SURFS = {}
