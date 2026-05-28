@@ -17,18 +17,18 @@ class Ball:
         self.base_speed = self.speed
         self.color      = random.choice(BALL_COLORS)
         self.angle      = random.uniform(-180, 180)
-        self.x          = WIDTH  / 2
-        self.y          = HEIGHT / 2
+        self.x          = C.WIDTH  / 2
+        self.y          = C.HEIGHT / 2
         self.slowmo     = False
 
     def set_position_random_edge(self):
         side = random.randint(0, 3)
-        if side == 0:   self.x, self.y = random.uniform(self.r, WIDTH-self.r), self.r
-        elif side == 1: self.x, self.y = WIDTH-self.r, random.uniform(self.r, HEIGHT-self.r)
-        elif side == 2: self.x, self.y = random.uniform(self.r, WIDTH-self.r), HEIGHT-self.r
-        else:           self.x, self.y = self.r, random.uniform(self.r, HEIGHT-self.r)
-        dx = WIDTH/2 - self.x
-        dy = HEIGHT/2 - self.y
+        if side == 0:   self.x, self.y = random.uniform(self.r, C.WIDTH-self.r), self.r
+        elif side == 1: self.x, self.y = C.WIDTH-self.r, random.uniform(self.r, C.HEIGHT-self.r)
+        elif side == 2: self.x, self.y = random.uniform(self.r, C.WIDTH-self.r), C.HEIGHT-self.r
+        else:           self.x, self.y = self.r, random.uniform(self.r, C.HEIGHT-self.r)
+        dx = C.WIDTH/2 - self.x
+        dy = C.HEIGHT/2 - self.y
         self.angle = math.degrees(math.atan2(dy, dx)) + random.uniform(-40, 40)
 
     def update_speed(self, score, mode):
@@ -49,7 +49,7 @@ class Ball:
             self.angle += max(-HOMING_TURN_RATE, min(HOMING_TURN_RATE, diff))
         self.x += self.speed * math.cos(math.radians(self.angle))
         self.y += self.speed * math.sin(math.radians(self.angle))
-        bounds = zone_rect if zone_rect else pygame.Rect(0, 0, WIDTH, HEIGHT)
+        bounds = zone_rect if zone_rect else pygame.Rect(0, 0, C.WIDTH, C.HEIGHT)
         if self.x - self.r < bounds.left or self.x + self.r > bounds.right:
             self.angle = 180 - self.angle
             self.x = max(bounds.left + self.r, min(bounds.right  - self.r, self.x))
@@ -79,28 +79,45 @@ class Ball:
 
 class Target:
     def __init__(self):
-        self.w = 20
-        self.h = 20
-        self.x = WIDTH  // 2
-        self.y = HEIGHT // 2
+        self.w     = 20
+        self.h     = 20
+        self.x     = C.WIDTH  // 2
+        self.y     = C.HEIGHT // 2
         self.color = random.choice(BALL_COLORS)
+        self._pulse = random.randint(0, 360)  # stagger so all targets don't sync
 
     def respawn(self, zone_rect=None):
-        bounds = zone_rect if zone_rect else pygame.Rect(0, 0, WIDTH, HEIGHT)
+        bounds = zone_rect if zone_rect else pygame.Rect(0, 0, C.WIDTH, C.HEIGHT)
         margin = self.w * 2
         self.x = random.randint(bounds.left + margin, bounds.right  - margin)
         self.y = random.randint(bounds.top  + margin, bounds.bottom - margin)
         self.color = random.choice(BALL_COLORS)
+        self._pulse = random.randint(0, 360)
+
+    def update(self):
+        self._pulse = (self._pulse + 3) % 360
 
     def draw(self, surface):
+        self._pulse = (self._pulse + 3) % 360
+        breath = (math.sin(math.radians(self._pulse)) + 1) / 2  # 0..1
         cx, cy = self.x + self.w//2, self.y + self.h//2
-        # glow
-        gr = self.w + 8
-        gs = pygame.Surface((gr*2, gr*2), pygame.SRCALPHA)
-        pygame.draw.rect(gs, (*self.color, 50), (0, 0, gr*2, gr*2), border_radius=4)
-        surface.blit(gs, (cx - gr, cy - gr))
-        pygame.draw.rect(surface, self.color, (self.x, self.y, self.w, self.h), border_radius=3)
-        pygame.draw.rect(surface, WHITE,      (self.x, self.y, self.w, self.h), 2, border_radius=3)
+        # outer glow breathes in size and alpha
+        glow_r  = int((self.w + 6) + breath * 10)
+        glow_a  = int(30 + breath * 90)
+        gs = pygame.Surface((glow_r*2, glow_r*2), pygame.SRCALPHA)
+        pygame.draw.rect(gs, (*self.color, glow_a),
+                         (0, 0, glow_r*2, glow_r*2), border_radius=6)
+        surface.blit(gs, (cx - glow_r, cy - glow_r))
+        # inner fill brightens on peak
+        bright = tuple(min(255, int(v + breath * 60)) for v in self.color)
+        pygame.draw.rect(surface, bright,
+                         (self.x, self.y, self.w, self.h), border_radius=3)
+        # border alpha also pulses
+        border_a = int(160 + breath * 95)
+        border_s = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
+        pygame.draw.rect(border_s, (255, 255, 255, border_a),
+                         (0, 0, self.w, self.h), 2, border_radius=3)
+        surface.blit(border_s, (self.x, self.y))
 
     def player_overlap(self, px, py, p_radius):
         cx = self.x + self.w / 2
@@ -114,7 +131,7 @@ class PowerUp:
     GLOW_ALPHAS = [25, 45, 70]
 
     def __init__(self, zone_rect=None):
-        bounds = zone_rect if zone_rect else pygame.Rect(0, 0, WIDTH, HEIGHT)
+        bounds = zone_rect if zone_rect else pygame.Rect(0, 0, C.WIDTH, C.HEIGHT)
         m = self.RADIUS + 20
         self.x     = random.randint(bounds.left + m, bounds.right  - m)
         self.y     = random.randint(bounds.top  + m, bounds.bottom - m)
@@ -143,7 +160,7 @@ class PowerUp:
 
 class Wall:
     def __init__(self, zone_rect=None):
-        bounds = zone_rect if zone_rect else pygame.Rect(0, 0, WIDTH, HEIGHT)
+        bounds = zone_rect if zone_rect else pygame.Rect(0, 0, C.WIDTH, C.HEIGHT)
         horiz  = random.random() < 0.5
         margin = 80
         if horiz:

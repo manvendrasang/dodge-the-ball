@@ -1,9 +1,10 @@
 # pylint: disable=missing-module-docstring, missing-function-docstring, global-statement, unused-wildcard-import
-# pylint: disable=missing-class-docstring, no-member, unused-import, unused-argument, unused-variable
+# pylint: disable=missing-class-docstring, no-member, unused-import, unused-argument, unused-variable, multiple-statements
 
 import random
 import math
 import pygame
+import constants as C
 from constants import *
 from entities import Ball, Target, PowerUp, Wall
 from effects import EffectsManager
@@ -12,11 +13,11 @@ from ui import draw_hud
 
 # pre-allocated glow surface pool for trail (avoids per-frame alloc)
 _TRAIL_SURFS = {}
-def _get_trail_surf(r, alpha):
-    key = (r, alpha)
+def _get_trail_surf(r, alpha, color=(255, 255, 255)):
+    key = (r, alpha, color)
     if key not in _TRAIL_SURFS:
         s = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
-        pygame.draw.circle(s, (255, 255, 255, alpha), (r, r), r)
+        pygame.draw.circle(s, (*color, alpha), (r, r), r)
         _TRAIL_SURFS[key] = s
     return _TRAIL_SURFS[key]
 
@@ -66,7 +67,7 @@ class GameSession:
         self.shield       = False
         self.lives        = 1 if mode == "hardcore" else 0
         self.dead         = False
-        self.zone_rect    = pygame.Rect(0, 0, WIDTH, HEIGHT)
+        self.zone_rect    = pygame.Rect(0, 0, C.WIDTH, C.HEIGHT)
         self._pu_timer    = 5 * FPS
         self._wall_timer  = WALL_SPAWN_INTERVAL
         self._shrink_timer = SHRINK_INTERVAL
@@ -93,6 +94,7 @@ class GameSession:
     def collect_powerup(self, kind):
         self.active_pu[kind] = PU_DURATION[kind]
         self.effects.trigger_powerup(kind)
+        get_audio().play("powerup")
         if kind == PU_SHIELD:
             self.shield = True
         if kind == PU_SLOWMO:
@@ -120,6 +122,7 @@ class GameSession:
             return
         self.dead = True
         self.effects.trigger_death()
+        get_audio().play("death")
 
     def update(self):
         self.effects.update()
@@ -144,6 +147,7 @@ class GameSession:
 
         # target
         if self.target.player_overlap(*ppos, P_RADIUS):
+            get_audio().play("collect")
             mult = 2 if (PU_MULTI30 in self.active_pu or PU_MULTI90 in self.active_pu) else 1
             self.score += 1 * mult
             self.target.respawn(zone)
@@ -197,19 +201,20 @@ class GameSession:
         self.zone_rect = pygame.Rect(zr.x + SHRINK_STEP, zr.y + SHRINK_STEP, new_w, new_h)
         self._zone_overlay = None  # invalidate cached overlay
         self.effects.trigger_shrink_alert()
+        get_audio().play("shrink")
         if not self.zone_rect.collidepoint(self.target.x, self.target.y):
             self.target.respawn(self.zone_rect)
 
     def _draw_zone_overlay(self, surface):
         # cache the dark-border overlay; only regenerate on zone change
         if self._zone_overlay is None:
-            self._zone_overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            self._zone_overlay = pygame.Surface((C.WIDTH, C.HEIGHT), pygame.SRCALPHA)
             self._zone_overlay.fill((0, 0, 0, 0))
             for r in [
-                pygame.Rect(0, 0, self.zone_rect.left, HEIGHT),
-                pygame.Rect(self.zone_rect.right, 0, WIDTH - self.zone_rect.right, HEIGHT),
-                pygame.Rect(0, 0, WIDTH, self.zone_rect.top),
-                pygame.Rect(0, self.zone_rect.bottom, WIDTH, HEIGHT - self.zone_rect.bottom),
+                pygame.Rect(0, 0, self.zone_rect.left, C.HEIGHT),
+                pygame.Rect(self.zone_rect.right, 0, C.WIDTH - self.zone_rect.right, C.HEIGHT),
+                pygame.Rect(0, 0, C.WIDTH, self.zone_rect.top),
+                pygame.Rect(0, self.zone_rect.bottom, C.WIDTH, C.HEIGHT - self.zone_rect.bottom),
             ]:
                 self._zone_overlay.fill((0, 0, 0, 110), r)
         surface.blit(self._zone_overlay, (0, 0))
@@ -217,7 +222,7 @@ class GameSession:
 
     def draw(self):
         ox, oy   = self.effects.get_offset()
-        game_surf = pygame.Surface((WIDTH, HEIGHT))
+        game_surf = pygame.Surface((C.WIDTH, C.HEIGHT))
         game_surf.fill(BG)
 
         if self.mode == "shrink":
@@ -265,27 +270,68 @@ class GameSession:
         self.display.blit(game_surf, (ox, oy))
 
     def _draw_trail(self, surface):
-        n = len(self._trail)
-        for i, pos in enumerate(self._trail):
-            # older points = smaller and more transparent
-            frac  = (i + 1) / n
-            r     = max(2, int(P_RADIUS * frac * TRAIL_SHRINK * 1.2))
-            alpha = int(180 * frac * frac)
-            s = _get_trail_surf(r, alpha)
-            surface.blit(s, (pos[0] - r, pos[1] - r))
+        pts = self._trail
+        n   = len(pts)
+        if n < 2:
+            return
+        # build interpolated point list for smooth curve
+        smooth = []
+        for i in range(n - 1):
+            x0, y0 = pts[i]
+            x1, y1 = pts[i + 1]
+            smooth.append((x0, y0))
+            smooth.append(((x0 + x1) / 2, (y0 + y1) / 2))  # midpoint
+        smooth.append(pts[-1])
+        total = len(smooth)
+        for i, pos in enumerate(smooth):
+            frac  = (i + 1) / total          # 0..1, newest = 1
+            r     = max(1, int(P_RADIUS * 0.9 * frac))
+            alpha = int(150 * frac ** 2)      # quadratic fade, near-zero at tail
+            # color shifts from blue-white at head to purple at tail
+            r_c = int(160 + 95 * frac)
+            g_c = int(100 * frac)
+            b_c = 255
+            s = _get_trail_surf(r, alpha, (r_c, g_c, b_c))
+            surface.blit(s, (int(pos[0]) - r, int(pos[1]) - r))
 
 
 def run_session(mode, display, clock) -> int:
     pygame.mouse.set_visible(False)
     session = GameSession(mode, display, clock)
+    paused  = False
     while True:
-        for event in pygame.event.get():
+        ev_list = pygame.event.get()
+        for event in ev_list:
             if event.type == pygame.QUIT:
-                pygame.quit()
-                raise SystemExit
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
-                pygame.quit()
-                raise SystemExit
+                pygame.quit(); raise SystemExit
+            if event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_ESCAPE, pygame.K_p) and not session.dead:
+                    paused = not paused
+                    pygame.mouse.set_visible(paused)
+                if event.key == pygame.K_q and not paused:
+                    pygame.quit(); raise SystemExit
+        if paused:
+            pause_buttons = draw_pause(display)
+            for event in ev_list:
+                for btn in pause_buttons:
+                    if btn.clicked(event):
+                        lbl = btn.label.lower()
+                        if lbl == "resume":
+                            paused = False
+                            pygame.mouse.set_visible(False)
+                        elif lbl == "restart":
+                            pygame.mouse.set_visible(False)
+                            pygame.event.clear()
+                            return run_session(mode, display, clock)
+                        elif lbl == "menu":
+                            pygame.mouse.set_visible(True)
+                            submit_score(mode, session.score)
+                            return -1  # sentinel: caller goes to menu
+                        elif lbl == "quit":
+                            pygame.quit(); raise SystemExit
+            pygame.display.update()
+            clock.tick(FPS)
+            continue
         session.update()
         session.draw()
         pygame.display.update()
