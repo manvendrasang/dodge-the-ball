@@ -108,6 +108,10 @@ WALL_CHANCE         = 0.6
 P_RADIUS   = 10
 BALL_RADIUS = P_RADIUS + 2
 
+# combo system
+COMBO_TIMEOUT  = int(FPS * 2.2)  # frames before streak resets
+COMBO_MAX      = {"classic": 4, "shrink": 6, "hardcore": 8}
+
 # trail
 TRAIL_LEN    = 18
 TRAIL_SHRINK = 0.82  # radius multiplier per older point

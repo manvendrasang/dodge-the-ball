@@ -1,11 +1,19 @@
-# pylint: disable=missing-module-docstring, missing-function-docstring, global-statement, unused-wildcard-import
-# pylint: disable=missing-class-docstring, no-member, no-name-in-module, multiple-statements, unused-variable
+# pylint: disable=missing-module-docstring, missing-function-docstring, global-statement, unused-wildcard-import, line-too-long
+# pylint: disable=missing-class-docstring, no-member, no-name-in-module, multiple-statements, unused-variable, unused-import
 
 import pygame
 import constants as C
 from constants import *
 from scores import get_scores, get_personal_best
 from audio import get_audio
+
+def _combo_hud_color(combo):
+    if combo <= 1:  return (200, 200, 255)
+    if combo == 2:  return (80,  220, 255)
+    if combo == 3:  return (80,  255, 160)
+    if combo == 4:  return (255, 220, 40)
+    if combo == 5:  return (255, 140, 40)
+    return (255, 60, 60)  # 6+ (shrink/hardcore only)
 
 class Button:
     def __init__(self, rect, label, color, hover_color, text_color=None):
@@ -128,9 +136,9 @@ def draw_leaderboard(surface, active_tab_idx):
         tx = tab_start + i*(tab_w+10)
         active = i == active_tab_idx
         b = Button((tx, 86, tab_w, tab_h), lbl,
-                   fg if active else bg,
-                   fg,
-                   DARK if active else WHITE)
+                fg if active else bg,
+                fg,
+                DARK if active else WHITE)
         b.draw(surface)
         tab_buttons.append(b)
     mode    = MODES[active_tab_idx]
@@ -166,15 +174,13 @@ def draw_leaderboard(surface, active_tab_idx):
     return [bk], tab_buttons
 
 
-def draw_hud(surface, score, mode, active_pus, lives=None, shield=False):
+def draw_hud(surface, score, mode, active_pus, lives=None, shield=False, combo=0, combo_timer=0):
     sc_txt = C.FONT_HUD.render(f"SCORE  {score}", True, WHITE)
     surface.blit(sc_txt, (14, 12))
     pb = get_personal_best(mode)
     pb_txt = C.FONT_SMALL.render(f"BEST  {pb}", True, YELLOW)
     surface.blit(pb_txt, (14, 42))
-    mode_col = {
-        "classic": CYAN, "shrink": PURPLE, "hardcore": RED
-    }.get(mode, WHITE)
+    mode_col = {"classic": CYAN, "shrink": PURPLE, "hardcore": RED}.get(mode, WHITE)
     mode_txt = C.FONT_SMALL.render(mode.upper(), True, mode_col)
     surface.blit(mode_txt, (C.WIDTH - mode_txt.get_width() - 14, 12))
     if lives is not None:
@@ -187,6 +193,20 @@ def draw_hud(surface, score, mode, active_pus, lives=None, shield=False):
         gh = C.FONT_SMALL.render("◌  GHOST ACTIVE", True, (200, 200, 255))
         offset = 32 if shield else 12
         surface.blit(gh, (C.WIDTH//2 - gh.get_width()//2, offset))
+    # combo indicator - top right below mode label
+    if combo > 1:
+        import math
+        frac      = combo_timer / COMBO_TIMEOUT if COMBO_TIMEOUT > 0 else 0
+        col       = _combo_hud_color(combo)
+        combo_txt = C.FONT_HUD.render(f"{combo}x COMBO", True, col)
+        cx        = C.WIDTH - combo_txt.get_width() - 14
+        cy        = 62
+        surface.blit(combo_txt, (cx, cy))
+        # thin timeout bar beneath the text
+        bar_w = combo_txt.get_width()
+        bar_h = 3
+        pygame.draw.rect(surface, (40, 40, 60), (cx, cy + combo_txt.get_height() + 2, bar_w, bar_h))
+        pygame.draw.rect(surface, col,          (cx, cy + combo_txt.get_height() + 2, int(bar_w * frac), bar_h))
     px = 14
     for kind, frames_left in active_pus.items():
         secs = max(0, frames_left // FPS)

@@ -1,4 +1,4 @@
-# pylint: disable=missing-module-docstring, missing-function-docstring, global-statement, unused-wildcard-import
+# pylint: disable=missing-module-docstring, missing-function-docstring, global-statement, unused-wildcard-import, too-many-function-args
 # pylint: disable=missing-class-docstring, no-member, unused-import, unused-argument, unused-variable, multiple-statements
 
 import random
@@ -11,6 +11,15 @@ from effects import EffectsManager
 from scores import submit_score
 from ui import draw_hud, draw_pause
 from audio import get_audio
+
+def _combo_color(combo):
+    """Return a neon color that escalates with combo level."""
+    if combo <= 1:  return (200, 200, 255)
+    if combo == 2:  return (80,  220, 255)
+    if combo == 3:  return (80,  255, 160)
+    if combo == 4:  return (255, 220, 40)
+    if combo == 5:  return (255, 140, 40)
+    return (255, 60, 60)  # max rage color for 6+
 
 # pre-allocated glow surface pool for trail (avoids per-frame alloc)
 _TRAIL_SURFS = {}
@@ -73,7 +82,11 @@ class GameSession:
         self._wall_timer  = WALL_SPAWN_INTERVAL
         self._shrink_timer = SHRINK_INTERVAL
         # trail: list of (x, y) deques
-        self._trail       = []
+        self._trail        = []
+        # combo state
+        self.combo         = 0        # current streak (0 = no combo)
+        self._combo_timer  = 0        # frames until streak resets
+        self._popups       = []       # list of active Popup dicts
         self.balls.append(_make_ball(0, mode))
         self.target.respawn(self.zone_rect if mode == "shrink" else None)
         # reusable surfaces
@@ -146,17 +159,42 @@ class GameSession:
                 if self.dead:
                     return
 
+        # combo timer tick
+        if self._combo_timer > 0:
+            self._combo_timer -= 1
+            if self._combo_timer == 0:
+                self.combo = 0
+
+        # tick popups
+        for p in self._popups:
+            p["life"] -= 1
+            p["y"]    -= 1.1   # float upward
+        self._popups = [p for p in self._popups if p["life"] > 0]
+
         # target
         if self.target.player_overlap(*ppos, P_RADIUS):
             get_audio().play("collect")
-            mult = 2 if (PU_MULTI30 in self.active_pu or PU_MULTI90 in self.active_pu) else 1
-            self.score += 1 * mult
+            # advance combo streak
+            self.combo        = min(self.combo + 1, COMBO_MAX[self.mode])
+            self._combo_timer = COMBO_TIMEOUT
+            pu_mult  = 2 if (PU_MULTI30 in self.active_pu or PU_MULTI90 in self.active_pu) else 1
+            points   = 1 * self.combo * pu_mult
+            self.score += points
+            # spawn floating popup at target center
+            tx = self.target.x + self.target.w // 2
+            ty = self.target.y
+            self._popups.append({
+                "x": tx, "y": ty,
+                "text": f"+{points}" + (f"  {self.combo}x COMBO" if self.combo > 1 else ""),
+                "color": _combo_color(self.combo),
+                "life": 52, "max_life": 52,
+            })
             self.target.respawn(zone)
             if _should_add_ball(self.balls, self.score, self.mode):
                 self.balls.append(_make_ball(self.score, self.mode))
 
-        # powerup spawning (classic + shrink only)
-        if self.mode != "hardcore":
+        # powerup spawning (shrink + hardcore only — classic has none)
+        if self.mode == "shrink":
             self._pu_timer -= 1
             if self._pu_timer <= 0:
                 self._pu_timer = PU_SPAWN_INTERVAL
@@ -266,7 +304,17 @@ class GameSession:
             pygame.draw.circle(game_surf, WHITE,   ppos, P_RADIUS, 1)
 
         lives_arg = self.lives if self.mode == "hardcore" else None
-        draw_hud(game_surf, self.score, self.mode, self.active_pu, lives_arg, self.shield)
+        draw_hud(game_surf, self.score, self.mode, self.active_pu, lives_arg, self.shield,
+                 self.combo, self._combo_timer)
+        # draw floating score popups
+        for p in self._popups:
+            frac  = p["life"] / p["max_life"]
+            alpha = int(255 * min(1.0, frac * 2.5))  # fast fade in, slow fade out
+            scale = 1.0 + (1.0 - frac) * 0.4         # slightly grows as it rises
+            font  = C.FONT_HUD if p["life"] > 20 else C.FONT_SMALL
+            lbl   = font.render(p["text"], True, p["color"])
+            lbl.set_alpha(alpha)
+            game_surf.blit(lbl, (int(p["x"]) - lbl.get_width()//2, int(p["y"])))
         self.effects.draw_overlays(game_surf)
         self.display.blit(game_surf, (ox, oy))
 
