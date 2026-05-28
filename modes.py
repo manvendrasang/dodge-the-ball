@@ -83,6 +83,9 @@ class GameSession:
         self._shrink_timer = SHRINK_INTERVAL
         # trail: list of (x, y) deques
         self._trail        = []
+        # level system
+        self.level         = 1
+        self._last_level   = 1
         # combo state
         self.combo         = 0        # current streak (0 = no combo)
         self._combo_timer  = 0        # frames until streak resets
@@ -180,6 +183,12 @@ class GameSession:
             pu_mult  = 2 if (PU_MULTI30 in self.active_pu or PU_MULTI90 in self.active_pu) else 1
             points   = 1 * self.combo * pu_mult
             self.score += points
+            # check level up
+            new_level = self.score // LEVEL_EVERY + 1
+            if new_level > self._last_level:
+                self.level       = new_level
+                self._last_level = new_level
+                self.effects.trigger_levelup(new_level)
             # spawn floating popup at target center
             tx = self.target.x + self.target.w // 2
             ty = self.target.y
@@ -260,9 +269,11 @@ class GameSession:
         pygame.draw.rect(surface, (80, 80, 140), self.zone_rect, 2)
 
     def draw(self):
-        ox, oy   = self.effects.get_offset()
+        ox, oy    = self.effects.get_offset()
         game_surf = pygame.Surface((C.WIDTH, C.HEIGHT))
-        game_surf.fill(BG)
+        # blend base BG with current level tint
+        tint = LEVEL_COLORS[(self.level - 1) % len(LEVEL_COLORS)]
+        game_surf.fill(tint)
 
         if self.mode == "shrink":
             self._draw_zone_overlay(game_surf)
@@ -305,7 +316,7 @@ class GameSession:
 
         lives_arg = self.lives if self.mode == "hardcore" else None
         draw_hud(game_surf, self.score, self.mode, self.active_pu, lives_arg, self.shield,
-                 self.combo, self._combo_timer)
+                 self.combo, self._combo_timer, self.level)
         # draw floating score popups
         for p in self._popups:
             frac  = p["life"] / p["max_life"]

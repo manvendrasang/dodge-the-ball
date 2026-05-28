@@ -108,7 +108,20 @@ WALL_CHANCE         = 0.6
 P_RADIUS   = 10
 BALL_RADIUS = P_RADIUS + 2
 
-# combo system
+# level system
+LEVEL_EVERY   = 10   # score points per level
+LEVEL_COLORS  = [    # BG tint per level (cycles after last)
+    (10,  12,  20),  # 0  default dark blue
+    (12,  20,  10),  # 1  dark green
+    (20,  10,  20),  # 2  dark purple
+    (20,  14,  10),  # 3  dark amber
+    (10,  20,  20),  # 4  dark teal
+    (20,  10,  10),  # 5  dark red
+    (10,  10,  22),  # 6  deep indigo
+    (18,  20,  10),  # 7  olive dark
+    (20,  10,  16),  # 8  dark rose
+    (10,  18,  22),  # 9  dark cyan
+]
 COMBO_TIMEOUT  = int(FPS * 2.2)  # frames before streak resets
 COMBO_MAX      = {"classic": 4, "shrink": 6, "hardcore": 8}
 

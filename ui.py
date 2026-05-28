@@ -136,9 +136,9 @@ def draw_leaderboard(surface, active_tab_idx):
         tx = tab_start + i*(tab_w+10)
         active = i == active_tab_idx
         b = Button((tx, 86, tab_w, tab_h), lbl,
-                fg if active else bg,
-                fg,
-                DARK if active else WHITE)
+                   fg if active else bg,
+                   fg,
+                   DARK if active else WHITE)
         b.draw(surface)
         tab_buttons.append(b)
     mode    = MODES[active_tab_idx]
@@ -174,12 +174,17 @@ def draw_leaderboard(surface, active_tab_idx):
     return [bk], tab_buttons
 
 
-def draw_hud(surface, score, mode, active_pus, lives=None, shield=False, combo=0, combo_timer=0):
+def draw_hud(surface, score, mode, active_pus, lives=None, shield=False, combo=0, combo_timer=0, level=1):
     sc_txt = C.FONT_HUD.render(f"SCORE  {score}", True, WHITE)
     surface.blit(sc_txt, (14, 12))
     pb = get_personal_best(mode)
     pb_txt = C.FONT_SMALL.render(f"BEST  {pb}", True, YELLOW)
     surface.blit(pb_txt, (14, 42))
+    lv_col = LEVEL_COLORS[(level - 1) % len(LEVEL_COLORS)]
+    # brighten the tint color so it's visible as text
+    lv_text_col = tuple(min(255, v * 8 + 120) for v in lv_col)
+    lv_txt = C.FONT_SMALL.render(f"LVL  {level}", True, lv_text_col)
+    surface.blit(lv_txt, (14, 64))
     mode_col = {"classic": CYAN, "shrink": PURPLE, "hardcore": RED}.get(mode, WHITE)
     mode_txt = C.FONT_SMALL.render(mode.upper(), True, mode_col)
     surface.blit(mode_txt, (C.WIDTH - mode_txt.get_width() - 14, 12))

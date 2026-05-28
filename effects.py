@@ -29,6 +29,12 @@ class EffectsManager:
         self.alert_text   = "! ZONE SHRINKING !"
         self.alert_frames = 90
 
+    def trigger_levelup(self, level):
+        self.alert_text   = f"LEVEL  {level}"
+        self.alert_frames = 100
+        self.glow_color   = (255, 255, 255)
+        self.glow_frames  = 30
+
     def get_offset(self):
         return self._offset
 
@@ -58,9 +64,12 @@ class EffectsManager:
             overlay = pygame.Surface((C.WIDTH, C.HEIGHT), pygame.SRCALPHA)
             overlay.fill((*self.glow_color, alpha))
             surface.blit(overlay, (0, 0))
-        # shrink zone alert
+        # shrink zone / level up alert
         if self.alert_frames > 0:
-            alpha = min(255, self.alert_frames * 5)
-            lbl = C.FONT_BIG.render(self.alert_text, True, (255, 80, 80))
+            alpha     = min(255, self.alert_frames * 4)
+            is_level  = self.alert_text.startswith("LEVEL")
+            col       = (80, 240, 255) if is_level else (255, 80, 80)
+            font      = C.FONT_TITLE if is_level else C.FONT_BIG
+            lbl = font.render(self.alert_text, True, col)
             lbl.set_alpha(alpha)
-            surface.blit(lbl, (C.WIDTH//2 - lbl.get_width()//2, C.HEIGHT//2 - 40))
+            surface.blit(lbl, (C.WIDTH//2 - lbl.get_width()//2, C.HEIGHT//2 - 50))
