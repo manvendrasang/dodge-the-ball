@@ -69,7 +69,8 @@ def draw_main_menu(surface):
         Button((cx, y0+bh+gap,    bw, bh), "Shrink Zone", (60,20,100),  (160,40,255),  WHITE),
         Button((cx, y0+(bh+gap)*2,bw, bh), "Hardcore",    (100,20,20),  (255,40,40),   WHITE),
         Button((cx, y0+(bh+gap)*3+10,bw,bh),"Leaderboard",(30,34,70),   BTN_LEADER_H,  CYAN),
-        Button((cx, y0+(bh+gap)*4+10,bw,bh),"Quit",       BTN_QUIT,     BTN_QUIT_H,    RED),
+        Button((cx, y0+(bh+gap)*4+10,bw,bh),"Settings",   (25,40,60),   (40,100,160),  WHITE),
+        Button((cx, y0+(bh+gap)*5+10,bw,bh),"Quit",       BTN_QUIT,     BTN_QUIT_H,    RED),
     ]
     for b in buttons:
         b.draw(surface)
@@ -285,3 +286,141 @@ def draw_pause(surface) -> list:
         trail_btns.append((b, td["id"], locked))
         ty += tbh + 8
     return buttons, trail_btns
+
+
+def draw_settings(surface, cfg: dict) -> dict:
+    """
+    Draw the settings screen.
+    Returns dict of named button lists for the caller to handle:
+      { "back": [...], "toggle_fs": [...], "colors": [...], "vol_sfx": [...], "vol_music": [...], "trails": [...] }
+    """
+    from settings import PLAYER_COLORS
+    from trails import TRAIL_DEFS, get_unlocked, get_active
+    surface.fill(C.BG)
+    for x in range(0, C.WIDTH, 60):
+        pygame.draw.line(surface, (18, 20, 34), (x, 0), (x, C.HEIGHT))
+    for y in range(0, C.HEIGHT, 60):
+        pygame.draw.line(surface, (18, 20, 34), (0, y), (0+C.WIDTH, y))
+
+    title = C.FONT_BIG.render("SETTINGS", True, CYAN)
+    surface.blit(title, (C.WIDTH//2 - title.get_width()//2, 28))
+
+    result = {"back": [], "toggle_fs": [], "colors": [], "trails": [],
+              "vol_sfx_up": [], "vol_sfx_dn": [], "vol_music_up": [], "vol_music_dn": []}
+
+    col_x  = C.WIDTH//2 - 540
+    trail_x = C.WIDTH//2 + 60
+    mid_x  = C.WIDTH//2 - 200
+    sec_y  = 100
+
+    # FULLSCREEN toggle
+    _panel(surface, pygame.Rect(mid_x, sec_y, 400, 68))
+    fs_lbl = C.FONT_HUD.render("FULLSCREEN", True, WHITE)
+    surface.blit(fs_lbl, (mid_x + 20, sec_y + 10))
+    fs_state = "ON" if cfg.get("fullscreen", True) else "OFF"
+    fs_col   = GREEN if cfg.get("fullscreen") else RED
+    fs_btn   = Button((mid_x + 260, sec_y + 10, 110, 40), fs_state, fs_col,
+                      tuple(min(255, v+60) for v in fs_col))
+    fs_btn.draw(surface)
+    result["toggle_fs"].append(fs_btn)
+
+    # PLAYER COLOR picker
+    sec_y2 = sec_y + 100
+    _panel(surface, pygame.Rect(col_x, sec_y2, 480, 180))
+    lbl = C.FONT_HUD.render("PLAYER COLOR", True, WHITE)
+    surface.blit(lbl, (col_x + 20, sec_y2 + 12))
+    active_idx = cfg.get("player_color", 0)
+    swatch_x = col_x + 20
+    swatch_y = sec_y2 + 48
+    for i, pc in enumerate(PLAYER_COLORS):
+        col   = pc["color"]
+        sw    = 42
+        gap   = 14
+        bx    = swatch_x + i * (sw + gap)
+        by    = swatch_y
+        # two rows of 4
+        if i >= 4:
+            bx = swatch_x + (i-4) * (sw + gap)
+            by = swatch_y + sw + 10
+        selected = i == active_idx
+        # glow for selected
+        if selected:
+            gs = pygame.Surface((sw+12, sw+12), pygame.SRCALPHA)
+            pygame.draw.rect(gs, (*col, 80), (0, 0, sw+12, sw+12), border_radius=8)
+            surface.blit(gs, (bx-6, by-6))
+        pygame.draw.rect(surface, col,   (bx, by, sw, sw), border_radius=6)
+        pygame.draw.rect(surface, WHITE if selected else DIM, (bx, by, sw, sw), 2, border_radius=6)
+        b = Button((bx, by, sw, sw), "", col, tuple(min(255,v+60) for v in col))
+        result["colors"].append((b, i))
+
+    # draw all color swatches as clickable (no text)
+    name_txt = C.FONT_SMALL.render(PLAYER_COLORS[active_idx]["name"], True, YELLOW)
+    surface.blit(name_txt, (col_x + 20, sec_y2 + 148))
+
+    # VOLUME controls
+    sec_y3 = sec_y2 + 200
+    _panel(surface, pygame.Rect(col_x, sec_y3, 480, 130))
+    vol_lbl = C.FONT_HUD.render("VOLUME", True, WHITE)
+    surface.blit(vol_lbl, (col_x + 20, sec_y3 + 10))
+    # SFX row
+    sfx_v = cfg.get("sfx_volume", 0.7)
+    sfx_txt = C.FONT_SMALL.render(f"SFX   {int(sfx_v*100):>3}%", True, WHITE)
+    surface.blit(sfx_txt, (col_x + 20, sec_y3 + 48))
+    dn1 = Button((col_x + 240, sec_y3 + 44, 36, 30), "◀", (30,30,60), BLUE)
+    up1 = Button((col_x + 284, sec_y3 + 44, 36, 30), "▶", (30,30,60), BLUE)
+    dn1.draw(surface); up1.draw(surface)
+    result["vol_sfx_dn"].append(dn1); result["vol_sfx_up"].append(up1)
+    # music row
+    mu_v = cfg.get("music_volume", 0.45)
+    mu_txt = C.FONT_SMALL.render(f"MUSIC {int(mu_v*100):>3}%", True, WHITE)
+    surface.blit(mu_txt, (col_x + 20, sec_y3 + 86))
+    dn2 = Button((col_x + 240, sec_y3 + 82, 36, 30), "◀", (30,30,60), BLUE)
+    up2 = Button((col_x + 284, sec_y3 + 82, 36, 30), "▶", (30,30,60), BLUE)
+    dn2.draw(surface); up2.draw(surface)
+    result["vol_music_dn"].append(dn2); result["vol_music_up"].append(up2)
+
+    # TRAIL STYLE picker
+    _panel(surface, pygame.Rect(trail_x, sec_y2, 340, 310))
+    trl = C.FONT_HUD.render("TRAIL STYLE", True, WHITE)
+    surface.blit(trl, (trail_x + 20, sec_y2 + 12))
+    unlocked = set(get_unlocked())
+    active_trail = get_active()
+    ty = sec_y2 + 50
+    for td in TRAIL_DEFS:
+        locked = td["id"] not in unlocked
+        is_act = td["id"] == active_trail
+        if locked:
+            bg   = (22, 22, 38); hov = (22, 22, 38); tc = DIM
+            txt  = f"{td['name']}  @ {td['unlock']}"
+        else:
+            bg   = (20,80,30) if is_act else (28,30,55)
+            hov  = GREEN if is_act else (60,80,160)
+            tc   = WHITE
+            txt  = td["name"] + (" ✓" if is_act else "")
+        b = Button((trail_x+20, ty, 300, 38), txt, bg, hov, tc)
+        if not locked:
+            b.draw(surface)
+        else:
+            pygame.draw.rect(surface, bg, (trail_x+20, ty, 300, 38), border_radius=6)
+            pygame.draw.rect(surface, (35,35,55), (trail_x+20, ty, 300, 38), 1, border_radius=6)
+            ll = C.FONT_SMALL.render(txt, True, DIM)
+            surface.blit(ll, (trail_x+20+150-ll.get_width()//2, ty+10))
+        result["trails"].append((b, td["id"], locked))
+        ty += 46
+
+    # BACK button
+    bk = Button((C.WIDTH//2 - 120, C.HEIGHT - 68, 240, 48), "Back to Menu", (30,34,70), BTN_LEADER_H, CYAN)
+    bk.draw(surface)
+    result["back"].append(bk)
+
+    # player preview dot
+    preview_col = PLAYER_COLORS[active_idx]["color"]
+    px_ = mid_x + 360
+    py_ = sec_y + 14
+    gs2 = pygame.Surface((40, 40), pygame.SRCALPHA)
+    pygame.draw.circle(gs2, (*preview_col, 50), (20,20), 20)
+    surface.blit(gs2, (px_-20, py_-20))
+    pygame.draw.circle(surface, preview_col, (px_, py_+20), 12)
+    pygame.draw.circle(surface, WHITE,       (px_, py_+20), 12, 2)
+
+    return result

@@ -12,6 +12,7 @@ from scores import submit_score
 from ui import draw_hud, draw_pause
 from audio import get_audio
 from trails import get_color_fn, get_active, check_and_unlock, trail_alpha
+from settings import get_player_color
 
 def _combo_color(combo):
     """Return a neon color that escalates with combo level."""
@@ -84,9 +85,10 @@ class GameSession:
         self._shrink_timer = SHRINK_INTERVAL
         # trail: list of (x, y) deques
         self._trail        = []
-        self._trail_id     = get_active()   # loaded from save
+        self._trail_id     = get_active()
         self._trail_fn     = get_color_fn(self._trail_id)
-        self._unlock_notif = []             # newly unlocked trail names to flash
+        self._unlock_notif = []
+        self._player_color = get_player_color()
         # level system
         self.level         = 1
         self._last_level   = 1
@@ -300,31 +302,26 @@ class GameSession:
 
         # draw trail then player
         self._draw_trail(game_surf)
-        ppos = pygame.mouse.get_pos()
+        ppos  = pygame.mouse.get_pos()
+        pcol  = self._player_color
         if self.ghost_active:
-            frames_left = self.active_pu.get(PU_GHOST, 0)
-            pulse = abs(math.sin(pygame.time.get_ticks() * 0.008))
-            # outer halo
+            pulse  = abs(math.sin(pygame.time.get_ticks() * 0.008))
             halo_r = int(P_RADIUS * 2.5 + pulse * 6)
             halo_s = pygame.Surface((halo_r*2, halo_r*2), pygame.SRCALPHA)
             pygame.draw.circle(halo_s, (200, 200, 255, int(50 + pulse * 60)),
                                (halo_r, halo_r), halo_r)
             game_surf.blit(halo_s, (ppos[0] - halo_r, ppos[1] - halo_r))
-            # translucent player body
             ghost_s = pygame.Surface((P_RADIUS*2+2, P_RADIUS*2+2), pygame.SRCALPHA)
-            alpha = int(80 + pulse * 80)
-            pygame.draw.circle(ghost_s, (220, 220, 255, alpha),
-                               (P_RADIUS+1, P_RADIUS+1), P_RADIUS)
-            pygame.draw.circle(ghost_s, (255, 255, 255, alpha),
-                               (P_RADIUS+1, P_RADIUS+1), P_RADIUS, 1)
+            alpha   = int(80 + pulse * 80)
+            pygame.draw.circle(ghost_s, (220, 220, 255, alpha), (P_RADIUS+1, P_RADIUS+1), P_RADIUS)
+            pygame.draw.circle(ghost_s, (255, 255, 255, alpha), (P_RADIUS+1, P_RADIUS+1), P_RADIUS, 1)
             game_surf.blit(ghost_s, (ppos[0] - P_RADIUS - 1, ppos[1] - P_RADIUS - 1))
         else:
-            # normal player glow + body
             pg_s = pygame.Surface((P_RADIUS*4, P_RADIUS*4), pygame.SRCALPHA)
-            pygame.draw.circle(pg_s, (255, 255, 255, 40), (P_RADIUS*2, P_RADIUS*2), P_RADIUS*2)
+            pygame.draw.circle(pg_s, (*pcol, 40), (P_RADIUS*2, P_RADIUS*2), P_RADIUS*2)
             game_surf.blit(pg_s, (ppos[0] - P_RADIUS*2, ppos[1] - P_RADIUS*2))
-            pygame.draw.circle(game_surf, P_COLOR, ppos, P_RADIUS)
-            pygame.draw.circle(game_surf, WHITE,   ppos, P_RADIUS, 1)
+            pygame.draw.circle(game_surf, pcol,  ppos, P_RADIUS)
+            pygame.draw.circle(game_surf, WHITE, ppos, P_RADIUS, 1)
 
         lives_arg = self.lives if self.mode == "hardcore" else None
         draw_hud(game_surf, self.score, self.mode, self.active_pu, lives_arg, self.shield,
