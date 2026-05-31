@@ -8,18 +8,21 @@ import constants as C
 from constants import *
 
 class Ball:
+    SPAWN_FRAMES = 22  # length of entry animation
+
     def __init__(self, speed, homing=False, heavy=False):
-        self.homing     = homing
-        self.heavy      = heavy
-        self.r          = HEAVY_RADIUS if heavy else LIGHT_RADIUS
-        spd_mult        = HEAVY_SPEED_M if heavy else LIGHT_SPEED_M
-        self.speed      = speed * spd_mult
-        self.base_speed = self.speed
-        self.color      = random.choice(BALL_COLORS)
-        self.angle      = random.uniform(-180, 180)
-        self.x          = C.WIDTH  / 2
-        self.y          = C.HEIGHT / 2
-        self.slowmo     = False
+        self.homing       = homing
+        self.heavy        = heavy
+        self.r            = HEAVY_RADIUS if heavy else LIGHT_RADIUS
+        spd_mult          = HEAVY_SPEED_M if heavy else LIGHT_SPEED_M
+        self.speed        = speed * spd_mult
+        self.base_speed   = self.speed
+        self.color        = random.choice(BALL_COLORS)
+        self.angle        = random.uniform(-180, 180)
+        self.x            = C.WIDTH  / 2
+        self.y            = C.HEIGHT / 2
+        self.slowmo       = False
+        self.spawn_frames = self.SPAWN_FRAMES  # counts down to 0
 
     def set_position_random_edge(self):
         side = random.randint(0, 3)
@@ -40,6 +43,8 @@ class Ball:
             self.speed *= 0.38
 
     def move(self, player_pos, zone_rect=None):
+        if self.spawn_frames > 0:
+            self.spawn_frames -= 1
         if self.homing and player_pos:
             dx = player_pos[0] - self.x
             dy = player_pos[1] - self.y
@@ -59,14 +64,40 @@ class Ball:
 
     def draw(self, surface):
         cx, cy = int(self.x), int(self.y)
-        # neon glow: draw larger dim circle first
+        # spawn animation
+        if self.spawn_frames > 0:
+            t     = self.spawn_frames / self.SPAWN_FRAMES  # 1.0→0.0 as animation plays
+            frac  = 1.0 - t                                # 0.0→1.0 progress
+            # ball zooms from 0 to full size
+            draw_r = max(1, int(self.r * frac))
+            # expanding ring burst: starts at ball size, expands outward, fades
+            ring_r = int(self.r + (self.r * 3) * frac)
+            ring_a = int(220 * t)                          # bright at start, gone at end
+            if ring_a > 0:
+                rs = pygame.Surface((ring_r*2+4, ring_r*2+4), pygame.SRCALPHA)
+                pygame.draw.circle(rs, (*self.color, ring_a), (ring_r+2, ring_r+2), ring_r, 3)
+                surface.blit(rs, (cx - ring_r - 2, cy - ring_r - 2))
+            # secondary tighter ring
+            ring2_r = int(self.r * 0.5 + (self.r * 2.5) * frac)
+            ring2_a = int(140 * t)
+            if ring2_a > 0 and ring2_r > 0:
+                rs2 = pygame.Surface((ring2_r*2+4, ring2_r*2+4), pygame.SRCALPHA)
+                pygame.draw.circle(rs2, (*self.color, ring2_a), (ring2_r+2, ring2_r+2), ring2_r, 2)
+                surface.blit(rs2, (cx - ring2_r - 2, cy - ring2_r - 2))
+            # glow scales with ball
+            glow_r = draw_r + 5
+            glow_s = pygame.Surface((glow_r*2, glow_r*2), pygame.SRCALPHA)
+            pygame.draw.circle(glow_s, (*self.color, int(55 * frac)), (glow_r, glow_r), glow_r)
+            surface.blit(glow_s, (cx - glow_r, cy - glow_r))
+            if draw_r > 0:
+                pygame.draw.circle(surface, self.color, (cx, cy), draw_r)
+            return
+        # normal draw
         glow_r = self.r + 6
         glow_s = pygame.Surface((glow_r*2, glow_r*2), pygame.SRCALPHA)
-        gc = (*self.color, 55)
-        pygame.draw.circle(glow_s, gc, (glow_r, glow_r), glow_r)
+        pygame.draw.circle(glow_s, (*self.color, 55), (glow_r, glow_r), glow_r)
         surface.blit(glow_s, (cx - glow_r, cy - glow_r))
         pygame.draw.circle(surface, self.color, (cx, cy), self.r)
-        # bright core
         core_r = max(3, self.r // 3)
         cc = tuple(min(255, v + 120) for v in self.color)
         pygame.draw.circle(surface, cc, (cx, cy), core_r)
@@ -74,6 +105,8 @@ class Ball:
             pygame.draw.circle(surface, WHITE, (cx, cy), self.r, 2)
 
     def collides_with_player(self, px, py, p_radius):
+        if self.spawn_frames > 0:
+            return False  # invulnerable during entry animation
         return math.hypot(px - self.x, py - self.y) <= self.r + p_radius
 
 
