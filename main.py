@@ -25,6 +25,7 @@ init_fonts()
 state        = "menu"
 current_mode = "classic"
 last_score   = 0
+last_stats   = {}
 lb_tab       = 0
 animator     = MenuAnimator()
 audio        = get_audio()
@@ -77,14 +78,14 @@ while True:
                         state = "game"
 
     elif state == "game":
-        last_score = run_session(current_mode, display, clock)
+        last_score, last_stats = run_session(current_mode, display, clock)
         pygame.event.clear()
         state = "menu" if last_score == -1 else "gameover"
 
     elif state == "gameover":
         if not _music_on:
             audio.start_music(); _music_on = True
-        over_buttons = draw_game_over(display, last_score, current_mode)
+        over_buttons = draw_game_over(display, last_score, current_mode, last_stats)
         for ev in ev_list:
             if ev.type == pygame.KEYDOWN:
                 if ev.key == pygame.K_r:

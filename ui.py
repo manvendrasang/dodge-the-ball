@@ -87,32 +87,69 @@ def draw_main_menu(surface):
     return buttons
 
 
-def draw_game_over(surface, score, mode):
+def draw_game_over(surface, score, mode, stats=None):
+    if stats is None:
+        stats = {}
     surface.fill(BG)
     for x in range(0, C.WIDTH, 60):
         pygame.draw.line(surface, (20, 22, 36), (x, 0), (x, C.HEIGHT))
     for y in range(0, C.HEIGHT, 60):
         pygame.draw.line(surface, (20, 22, 36), (0, y), (C.WIDTH, y))
-    # panel
-    pw, ph = 500, 360
-    _panel(surface, pygame.Rect(C.WIDTH//2 - pw//2, 100, pw, ph), 210)
+    # title
     t = C.FONT_TITLE.render("GAME OVER", True, RED)
     glow = C.FONT_TITLE.render("GAME OVER", True, (80, 10, 10))
     for off in [(-2,2),(2,2),(-2,-2),(2,-2)]:
-        surface.blit(glow, (C.WIDTH//2 - t.get_width()//2 + off[0], 118 + off[1]))
-    surface.blit(t, (C.WIDTH//2 - t.get_width()//2, 118))
-    s = C.FONT_BIG.render(f"Score: {score}", True, WHITE)
-    surface.blit(s, (C.WIDTH//2 - s.get_width()//2, 232))
+        surface.blit(glow, (C.WIDTH//2 - t.get_width()//2 + off[0], 60 + off[1]))
+    surface.blit(t, (C.WIDTH//2 - t.get_width()//2, 60))
+    sc = C.FONT_BIG.render(f"Score: {score}", True, WHITE)
+    surface.blit(sc, (C.WIDTH//2 - sc.get_width()//2, 168))
     pb = get_personal_best(mode)
     if score >= pb and score > 0:
         hi = C.FONT_HUD.render("★  NEW PERSONAL BEST  ★", True, YELLOW)
-        surface.blit(hi, (C.WIDTH//2 - hi.get_width()//2, 295))
-    bw, bh, gap = 260, 50, 12
-    cx = C.WIDTH//2 - bw//2
+        surface.blit(hi, (C.WIDTH//2 - hi.get_width()//2, 228))
+    # stats panel
+    if stats:
+        t_s  = stats.get("time_s", 0)
+        mins = t_s // 60; secs = t_s % 60
+        mode_col = {"classic": CYAN, "shrink": PURPLE, "hardcore": RED}.get(mode, WHITE)
+        # build mode-specific rows
+        rows = [
+            ("TIME SURVIVED",   f"{mins}:{secs:02d}",         WHITE),
+            ("BALLS DODGED",    str(stats.get("balls_dodged", 0)), CYAN),
+            ("LEVEL REACHED",   str(stats.get("level", 1)),    YELLOW),
+            ("PEAK COMBO",      f"{stats.get('peak_combo',0)}x", _combo_hud_color(stats.get("peak_combo",0))),
+        ]
+        if mode == "shrink":
+            rows.append(("ZONE SHRINKS",  str(stats.get("shrinks", 0)),  PURPLE))
+        if mode == "shrink" or mode == "hardcore":
+            rows.append(("POWERUPS",      str(stats.get("powerups", 0)), GREEN))
+        if mode == "hardcore":
+            rows.append(("WALLS SURVIVED", str(stats.get("walls", 0)),  ORANGE))
+        # draw panel
+        pw    = 520
+        ph    = 30 + len(rows) * 38
+        px_   = C.WIDTH//2 - pw//2
+        py_   = 268
+        _panel(surface, pygame.Rect(px_, py_, pw, ph), 200)
+        mode_lbl = C.FONT_SMALL.render(mode.upper() + " STATS", True, mode_col)
+        surface.blit(mode_lbl, (px_ + 18, py_ + 8))
+        for i, (label, value, col) in enumerate(rows):
+            ry = py_ + 32 + i * 38
+            lbl_s = C.FONT_HUD.render(label, True, DIM)
+            val_s = C.FONT_HUD.render(value, True, col)
+            surface.blit(lbl_s, (px_ + 18, ry))
+            surface.blit(val_s, (px_ + pw - val_s.get_width() - 18, ry))
+            if i < len(rows) - 1:
+                pygame.draw.line(surface, (35, 37, 60),
+                                 (px_+18, ry+32), (px_+pw-18, ry+32))
+    # buttons
+    btn_y = 268 + (30 + max(4, len(stats and [1]*4 or [])) * 38) + 20 if stats else 340
+    bw, bh, gap = 240, 46, 10
+    cx  = C.WIDTH//2 - bw//2
     buttons = [
-        Button((cx, 370, bw, bh), "[R]  Restart", (20,80,30),  GREEN,  WHITE),
-        Button((cx, 370+bh+gap, bw, bh), "[M]  Menu",    (20,50,100), BLUE,   WHITE),
-        Button((cx, 370+(bh+gap)*2, bw, bh), "[Q]  Quit",    BTN_QUIT,    BTN_QUIT_H, RED),
+        Button((cx, btn_y,             bw, bh), "[R]  Restart", (20,80,30),  GREEN,     WHITE),
+        Button((cx, btn_y+bh+gap,      bw, bh), "[M]  Menu",    (20,50,100), BLUE,      WHITE),
+        Button((cx, btn_y+(bh+gap)*2,  bw, bh), "[Q]  Quit",    BTN_QUIT,    BTN_QUIT_H, RED),
     ]
     for b in buttons:
         b.draw(surface)

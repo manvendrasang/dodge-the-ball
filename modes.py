@@ -89,6 +89,13 @@ class GameSession:
         self._trail_fn     = get_color_fn(self._trail_id)
         self._unlock_notif = []
         self._player_color = get_player_color()
+        # stats
+        self.stat_frames         = 0   # total frames alive → time survived
+        self.stat_balls_dodged   = 0   # incremented each frame no collision occurs
+        self.stat_powerups       = 0   # powerups collected
+        self.stat_peak_combo     = 0   # highest combo reached
+        self.stat_shrinks        = 0   # zone shrink events (shrink mode)
+        self.stat_walls_survived = 0   # walls that expired without killing (hardcore)
         # level system
         self.level         = 1
         self._last_level   = 1
@@ -118,6 +125,7 @@ class GameSession:
         self.active_pu[kind] = PU_DURATION[kind]
         self.effects.trigger_powerup(kind)
         get_audio().play("powerup")
+        self.stat_powerups += 1
         if kind == PU_SHIELD:
             self.shield = True
         if kind == PU_SLOWMO:
@@ -151,6 +159,8 @@ class GameSession:
         self.effects.update()
         if self.dead:
             return
+        self.stat_frames += 1
+        self.stat_balls_dodged += len(self.balls)
         ppos = pygame.mouse.get_pos()
         zone = self.zone_rect if self.mode == "shrink" else None
 
@@ -195,6 +205,8 @@ class GameSession:
             # advance combo streak
             self.combo        = min(self.combo + 1, COMBO_MAX[self.mode])
             self._combo_timer = COMBO_TIMEOUT
+            if self.combo > self.stat_peak_combo:
+                self.stat_peak_combo = self.combo
             pu_mult  = 2 if (PU_MULTI30 in self.active_pu or PU_MULTI90 in self.active_pu) else 1
             points   = 1 * self.combo * pu_mult
             self.score += points
@@ -255,6 +267,8 @@ class GameSession:
                     self.handle_death()
                     if self.dead:
                         return
+            expired = [w for w in self.walls if not w.alive]
+            self.stat_walls_survived += len(expired)
             self.walls = [w for w in self.walls if w.alive]
 
         # shrink zone
@@ -274,6 +288,7 @@ class GameSession:
         self._zone_overlay = None  # invalidate cached overlay
         self.effects.trigger_shrink_alert()
         get_audio().play("shrink")
+        self.stat_shrinks += 1
         if not self.zone_rect.collidepoint(self.target.x, self.target.y):
             self.target.respawn(self.zone_rect)
 
@@ -431,7 +446,7 @@ def run_session(mode, display, clock) -> int:
                         elif lbl == "menu":
                             pygame.mouse.set_visible(True)
                             submit_score(mode, session.score)
-                            return -1
+                            return -1, {}
                         elif lbl == "quit":
                             pygame.quit(); raise SystemExit
                 # trail selection
@@ -452,4 +467,13 @@ def run_session(mode, display, clock) -> int:
             break
     pygame.mouse.set_visible(True)
     submit_score(mode, session.score)
-    return session.score
+    stats = {
+        "time_s":       session.stat_frames // FPS,
+        "balls_dodged": session.stat_balls_dodged,
+        "powerups":     session.stat_powerups,
+        "peak_combo":   session.stat_peak_combo,
+        "shrinks":      session.stat_shrinks,
+        "walls":        session.stat_walls_survived,
+        "level":        session.level,
+    }
+    return session.score, stats
