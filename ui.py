@@ -222,26 +222,66 @@ def draw_hud(surface, score, mode, active_pus, lives=None, shield=False, combo=0
 
 def draw_pause(surface) -> list:
     """Semi-transparent pause overlay. Returns list of Buttons."""
+    from trails import TRAIL_DEFS, get_unlocked, get_active
     overlay = pygame.Surface((C.WIDTH, C.HEIGHT), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 160))
     surface.blit(overlay, (0, 0))
-    # panel
-    pw, ph = 420, 340
-    px_, py_ = C.WIDTH//2 - pw//2, C.HEIGHT//2 - ph//2
+    # left panel: standard pause buttons
+    pw, ph = 380, 360
+    px_ = C.WIDTH//2 - pw - 20
+    py_ = C.HEIGHT//2 - ph//2
     _panel(surface, pygame.Rect(px_, py_, pw, ph), 230)
     t = C.FONT_BIG.render("PAUSED", True, CYAN)
-    surface.blit(t, (C.WIDTH//2 - t.get_width()//2, py_ + 28))
+    surface.blit(t, (px_ + pw//2 - t.get_width()//2, py_ + 22))
     hint = C.FONT_SMALL.render("ESC / P  to resume", True, DIM)
-    surface.blit(hint, (C.WIDTH//2 - hint.get_width()//2, py_ + 88))
+    surface.blit(hint, (px_ + pw//2 - hint.get_width()//2, py_ + 82))
     bw, bh, gap = 280, 48, 10
-    cx = C.WIDTH//2 - bw//2
-    y0 = py_ + 138
+    cx  = px_ + pw//2 - bw//2
+    y0  = py_ + 130
     buttons = [
-        Button((cx, y0,             bw, bh), "Resume",   (20,80,30),  GREEN,      WHITE),
-        Button((cx, y0+bh+gap,      bw, bh), "Restart",  (20,60,120), BLUE,       WHITE),
-        Button((cx, y0+(bh+gap)*2,  bw, bh), "Menu",     (30,34,70),  BTN_LEADER_H, CYAN),
-        Button((cx, y0+(bh+gap)*3,  bw, bh), "Quit",     BTN_QUIT,    BTN_QUIT_H, RED),
+        Button((cx, y0,            bw, bh), "Resume",  (20,80,30),  GREEN,        WHITE),
+        Button((cx, y0+bh+gap,     bw, bh), "Restart", (20,60,120), BLUE,         WHITE),
+        Button((cx, y0+(bh+gap)*2, bw, bh), "Menu",    (30,34,70),  BTN_LEADER_H, CYAN),
+        Button((cx, y0+(bh+gap)*3, bw, bh), "Quit",    BTN_QUIT,    BTN_QUIT_H,   RED),
     ]
     for b in buttons:
         b.draw(surface)
-    return buttons
+    # right panel: trail selector
+    tp_w, tp_h = 320, ph
+    tp_x = C.WIDTH//2 + 20
+    tp_y = py_
+    _panel(surface, pygame.Rect(tp_x, tp_y, tp_w, tp_h), 230)
+    tl = C.FONT_HUD.render("TRAIL STYLE", True, CYAN)
+    surface.blit(tl, (tp_x + tp_w//2 - tl.get_width()//2, tp_y + 18))
+    unlocked = set(get_unlocked())
+    active   = get_active()
+    trail_btns = []
+    ty = tp_y + 58
+    tbw, tbh = 260, 38
+    tbx = tp_x + tp_w//2 - tbw//2
+    for td in TRAIL_DEFS:
+        locked = td["id"] not in unlocked
+        if locked:
+            col  = (30, 30, 45)
+            hcol = (30, 30, 45)
+            lbl  = f"{td['name']}  (unlock @ {td['unlock']})"
+            tcol = DIM
+        else:
+            is_active = td["id"] == active
+            col  = (20, 80, 30) if is_active else (28, 30, 55)
+            hcol = GREEN if is_active else (60, 80, 160)
+            lbl  = td["name"] + (" ✓" if is_active else "")
+            tcol = WHITE
+        b = Button((tbx, ty, tbw, tbh), lbl, col, hcol, tcol)
+        if not locked:
+            b.draw(surface)
+        else:
+            # draw locked state without hover effect
+            pygame.draw.rect(surface, col, pygame.Rect(tbx, ty, tbw, tbh), border_radius=6)
+            pygame.draw.rect(surface, (35, 35, 55), pygame.Rect(tbx, ty, tbw, tbh), 1, border_radius=6)
+            lock_lbl = C.FONT_SMALL.render(lbl, True, DIM)
+            surface.blit(lock_lbl, (tbx + tbw//2 - lock_lbl.get_width()//2,
+                                    ty + tbh//2 - lock_lbl.get_height()//2))
+        trail_btns.append((b, td["id"], locked))
+        ty += tbh + 8
+    return buttons, trail_btns

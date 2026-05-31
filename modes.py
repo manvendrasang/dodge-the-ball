@@ -1,5 +1,5 @@
-# pylint: disable=missing-module-docstring, missing-function-docstring, global-statement, unused-wildcard-import, too-many-function-args
-# pylint: disable=missing-class-docstring, no-member, unused-import, unused-argument, unused-variable, multiple-statements
+# pylint: disable=missing-function-docstring, missing-module-docstring, multiple-statements, no-member, unused-wildcard-import, missing-class-docstring
+# pylint: disable=line-too-long, unused-variable, unbalanced-tuple-unpacking, not-an-iterable, redefined-outer-name, protected-access
 
 import random
 import math
@@ -11,6 +11,7 @@ from effects import EffectsManager
 from scores import submit_score
 from ui import draw_hud, draw_pause
 from audio import get_audio
+from trails import get_color_fn, get_active, check_and_unlock, trail_alpha
 
 def _combo_color(combo):
     """Return a neon color that escalates with combo level."""
@@ -83,6 +84,9 @@ class GameSession:
         self._shrink_timer = SHRINK_INTERVAL
         # trail: list of (x, y) deques
         self._trail        = []
+        self._trail_id     = get_active()   # loaded from save
+        self._trail_fn     = get_color_fn(self._trail_id)
+        self._unlock_notif = []             # newly unlocked trail names to flash
         # level system
         self.level         = 1
         self._last_level   = 1
@@ -173,6 +177,10 @@ class GameSession:
             p["life"] -= 1
             p["y"]    -= 1.1   # float upward
         self._popups = [p for p in self._popups if p["life"] > 0]
+        # tick unlock notifications
+        for n in self._unlock_notif:
+            n["life"] -= 1
+        self._unlock_notif = [n for n in self._unlock_notif if n["life"] > 0]
 
         # target
         if self.target.player_overlap(*ppos, P_RADIUS):
@@ -183,6 +191,10 @@ class GameSession:
             pu_mult  = 2 if (PU_MULTI30 in self.active_pu or PU_MULTI90 in self.active_pu) else 1
             points   = 1 * self.combo * pu_mult
             self.score += points
+            # check trail unlocks
+            newly = check_and_unlock(self.score)
+            for name in newly:
+                self._unlock_notif.append({"text": f"TRAIL UNLOCKED: {name.upper()}", "life": 180, "max_life": 180})
             # check level up
             new_level = self.score // LEVEL_EVERY + 1
             if new_level > self._last_level:
@@ -320,12 +332,20 @@ class GameSession:
         # draw floating score popups
         for p in self._popups:
             frac  = p["life"] / p["max_life"]
-            alpha = int(255 * min(1.0, frac * 2.5))  # fast fade in, slow fade out
-            scale = 1.0 + (1.0 - frac) * 0.4         # slightly grows as it rises
+            alpha = int(255 * min(1.0, frac * 2.5))
             font  = C.FONT_HUD if p["life"] > 20 else C.FONT_SMALL
             lbl   = font.render(p["text"], True, p["color"])
             lbl.set_alpha(alpha)
             game_surf.blit(lbl, (int(p["x"]) - lbl.get_width()//2, int(p["y"])))
+        # draw trail unlock notifications (bottom center, above powerup timers)
+        notif_y = C.HEIGHT - 62
+        for n in self._unlock_notif:
+            frac  = n["life"] / n["max_life"]
+            alpha = int(255 * min(1.0, frac * 4))
+            lbl   = C.FONT_HUD.render(n["text"], True, YELLOW)
+            lbl.set_alpha(alpha)
+            game_surf.blit(lbl, (C.WIDTH//2 - lbl.get_width()//2, notif_y))
+            notif_y -= 34
         self.effects.draw_overlays(game_surf)
         self.display.blit(game_surf, (ox, oy))
 
@@ -344,14 +364,11 @@ class GameSession:
         smooth.append(pts[-1])
         total = len(smooth)
         for i, pos in enumerate(smooth):
-            frac  = (i + 1) / total          # 0..1, newest = 1
+            frac  = (i + 1) / total
             r     = max(1, int(P_RADIUS * 0.9 * frac))
-            alpha = int(150 * frac ** 2)      # quadratic fade, near-zero at tail
-            # color shifts from blue-white at head to purple at tail
-            r_c = int(160 + 95 * frac)
-            g_c = int(100 * frac)
-            b_c = 255
-            s = _get_trail_surf(r, alpha, (r_c, g_c, b_c))
+            alpha = trail_alpha(frac)
+            color = self._trail_fn(frac, pygame.time.get_ticks())
+            s = _get_trail_surf(r, alpha, color)
             surface.blit(s, (int(pos[0]) - r, int(pos[1]) - r))
 
 
@@ -371,7 +388,7 @@ def run_session(mode, display, clock) -> int:
                 if event.key == pygame.K_q and not paused:
                     pygame.quit(); raise SystemExit
         if paused:
-            pause_buttons = draw_pause(display)
+            pause_buttons, trail_btns = draw_pause(display)
             for event in ev_list:
                 for btn in pause_buttons:
                     if btn.clicked(event):
@@ -386,9 +403,16 @@ def run_session(mode, display, clock) -> int:
                         elif lbl == "menu":
                             pygame.mouse.set_visible(True)
                             submit_score(mode, session.score)
-                            return -1  # sentinel: caller goes to menu
+                            return -1
                         elif lbl == "quit":
                             pygame.quit(); raise SystemExit
+                # trail selection
+                for btn, trail_id, locked in trail_btns:
+                    if not locked and btn.clicked(event):
+                        from trails import set_active, get_color_fn
+                        set_active(trail_id)
+                        session._trail_id = trail_id
+                        session._trail_fn = get_color_fn(trail_id)
             pygame.display.update()
             clock.tick(FPS)
             continue
