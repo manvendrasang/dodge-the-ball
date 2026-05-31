@@ -177,7 +177,12 @@ class GameSession:
         # tick popups
         for p in self._popups:
             p["life"] -= 1
-            p["y"]    -= 1.1   # float upward
+            p["y"]    += p["vy"]
+            p["vy"]   *= 0.92          # decelerate upward movement
+            frac       = p["life"] / p["max_life"]
+            # scale pops from 1.6 down to 1.0 in first 20% of life, stays at 1.0
+            target_scale = 1.0
+            p["scale"] = target_scale + (p["scale"] - target_scale) * 0.78
         self._popups = [p for p in self._popups if p["life"] > 0]
         # tick unlock notifications
         for n in self._unlock_notif:
@@ -207,10 +212,15 @@ class GameSession:
             tx = self.target.x + self.target.w // 2
             ty = self.target.y
             self._popups.append({
-                "x": tx, "y": ty,
-                "text": f"+{points}" + (f"  {self.combo}x COMBO" if self.combo > 1 else ""),
-                "color": _combo_color(self.combo),
-                "life": 52, "max_life": 52,
+                "x":        float(tx),
+                "y":        float(ty),
+                "vy":       -1.8,          # initial upward velocity
+                "score_txt": f"+{points}",
+                "combo_txt": f"{self.combo}x COMBO" if self.combo > 1 else "",
+                "color":     _combo_color(self.combo),
+                "life":      64,
+                "max_life":  64,
+                "scale":     1.6,          # start big, shrink to 1.0
             })
             self.target.respawn(zone)
             if _should_add_ball(self.balls, self.score, self.mode):
@@ -329,11 +339,32 @@ class GameSession:
         # draw floating score popups
         for p in self._popups:
             frac  = p["life"] / p["max_life"]
-            alpha = int(255 * min(1.0, frac * 2.5))
-            font  = C.FONT_HUD if p["life"] > 20 else C.FONT_SMALL
-            lbl   = font.render(p["text"], True, p["color"])
-            lbl.set_alpha(alpha)
-            game_surf.blit(lbl, (int(p["x"]) - lbl.get_width()//2, int(p["y"])))
+            alpha = int(255 * min(1.0, frac * 3.0))
+            sc    = p["scale"]
+            cx_   = int(p["x"])
+            cy_   = int(p["y"])
+            # score number — always large
+            base_lbl = C.FONT_BIG.render(p["score_txt"], True, p["color"])
+            w0, h0 = base_lbl.get_size()
+            sw0 = int(w0 * sc); sh0 = int(h0 * sc)
+            if sw0 > 0 and sh0 > 0:
+                scaled = pygame.transform.smoothscale(base_lbl, (sw0, sh0))
+                # drop shadow
+                shadow = C.FONT_BIG.render(p["score_txt"], True, (0, 0, 0))
+                shadow = pygame.transform.smoothscale(shadow, (sw0, sh0))
+                shadow.set_alpha(int(alpha * 0.5))
+                game_surf.blit(shadow, (cx_ - sw0//2 + 2, cy_ - sh0//2 + 2))
+                scaled.set_alpha(alpha)
+                game_surf.blit(scaled, (cx_ - sw0//2, cy_ - sh0//2))
+            # combo label — smaller, below score
+            if p["combo_txt"]:
+                combo_lbl = C.FONT_HUD.render(p["combo_txt"], True, p["color"])
+                wc, hc    = combo_lbl.get_size()
+                swc = int(wc * min(sc, 1.1)); shc = int(hc * min(sc, 1.1))
+                if swc > 0 and shc > 0:
+                    combo_scaled = pygame.transform.smoothscale(combo_lbl, (swc, shc))
+                    combo_scaled.set_alpha(int(alpha * 0.9))
+                    game_surf.blit(combo_scaled, (cx_ - swc//2, cy_ - sh0//2 + sh0 + 2))
         # draw trail unlock notifications (bottom center, above powerup timers)
         notif_y = C.HEIGHT - 62
         for n in self._unlock_notif:
