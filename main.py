@@ -44,7 +44,6 @@ def _toggle_fullscreen():
     flags = pygame.FULLSCREEN if cfg["fullscreen"] else 0
     display = pygame.display.set_mode((SW, SH), flags)
 
-VOL_STEP = 0.05
 
 while True:
     ev_list = []
@@ -114,41 +113,32 @@ while True:
     elif state == "settings":
         if not _music_on:
             audio.start_music(); _music_on = True
-        cfg = load_cfg()  # reload so changes reflect immediately
+        cfg = load_cfg()
         btns = draw_settings(display, cfg)
         for ev in ev_list:
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
                 state = "menu"
-            # back
             for btn in btns["back"]:
                 if btn.clicked(ev): state = "menu"
-            # fullscreen toggle
             for btn in btns["toggle_fs"]:
                 if btn.clicked(ev): _toggle_fullscreen()
-            # player color swatches
             for btn, idx in btns["colors"]:
                 if btn.clicked(ev):
                     cfg["player_color"] = idx
                     save_cfg(cfg)
-            # volume up/down
-            for btn in btns["vol_sfx_up"]:
-                if btn.clicked(ev):
-                    cfg["sfx_volume"] = min(1.0, round(cfg.get("sfx_volume",0.7) + VOL_STEP, 2))
-                    save_cfg(cfg); _apply_volume()
-            for btn in btns["vol_sfx_dn"]:
-                if btn.clicked(ev):
-                    cfg["sfx_volume"] = max(0.0, round(cfg.get("sfx_volume",0.7) - VOL_STEP, 2))
-                    save_cfg(cfg); _apply_volume()
-            for btn in btns["vol_music_up"]:
-                if btn.clicked(ev):
-                    cfg["music_volume"] = min(1.0, round(cfg.get("music_volume",0.45) + VOL_STEP, 2))
-                    save_cfg(cfg); _apply_volume()
-            for btn in btns["vol_music_dn"]:
-                if btn.clicked(ev):
-                    cfg["music_volume"] = max(0.0, round(cfg.get("music_volume",0.45) - VOL_STEP, 2))
-                    save_cfg(cfg); _apply_volume()
-            # trail selection
-            from trails import set_active, get_color_fn
+            # slider drag — handle MOUSEBUTTONDOWN and MOUSEMOTION while held
+            for sl in btns["sliders"]:
+                if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                    if sl["rect"].collidepoint(ev.pos):
+                        raw = (ev.pos[0] - sl["track_x"]) / sl["track_w"]
+                        cfg[sl["key"]] = max(0.0, min(1.0, round(raw, 2)))
+                        save_cfg(cfg); _apply_volume()
+                if ev.type == pygame.MOUSEMOTION and ev.buttons[0]:
+                    if sl["rect"].collidepoint(ev.pos):
+                        raw = (ev.pos[0] - sl["track_x"]) / sl["track_w"]
+                        cfg[sl["key"]] = max(0.0, min(1.0, round(raw, 2)))
+                        save_cfg(cfg); _apply_volume()
+            from trails import set_active
             for btn, trail_id, locked in btns["trails"]:
                 if not locked and btn.clicked(ev):
                     set_active(trail_id)

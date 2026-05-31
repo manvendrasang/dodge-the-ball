@@ -342,8 +342,7 @@ def draw_settings(surface, cfg: dict) -> dict:
     title = C.FONT_BIG.render("SETTINGS", True, CYAN)
     surface.blit(title, (C.WIDTH//2 - title.get_width()//2, 28))
 
-    result = {"back": [], "toggle_fs": [], "colors": [], "trails": [],
-              "vol_sfx_up": [], "vol_sfx_dn": [], "vol_music_up": [], "vol_music_dn": []}
+    result = {"back": [], "toggle_fs": [], "colors": [], "trails": [], "sliders": []}
 
     col_x  = C.WIDTH//2 - 540
     trail_x = C.WIDTH//2 + 60
@@ -394,27 +393,42 @@ def draw_settings(surface, cfg: dict) -> dict:
     name_txt = C.FONT_SMALL.render(PLAYER_COLORS[active_idx]["name"], True, YELLOW)
     surface.blit(name_txt, (col_x + 20, sec_y2 + 148))
 
-    # VOLUME controls
+    # VOLUME sliders
     sec_y3 = sec_y2 + 200
-    _panel(surface, pygame.Rect(col_x, sec_y3, 480, 130))
+    _panel(surface, pygame.Rect(col_x, sec_y3, 480, 150))
     vol_lbl = C.FONT_HUD.render("VOLUME", True, WHITE)
     surface.blit(vol_lbl, (col_x + 20, sec_y3 + 10))
-    # SFX row
     sfx_v = cfg.get("sfx_volume", 0.7)
-    sfx_txt = C.FONT_SMALL.render(f"SFX   {int(sfx_v*100):>3}%", True, WHITE)
-    surface.blit(sfx_txt, (col_x + 20, sec_y3 + 48))
-    dn1 = Button((col_x + 240, sec_y3 + 44, 36, 30), "◀", (30,30,60), BLUE)
-    up1 = Button((col_x + 284, sec_y3 + 44, 36, 30), "▶", (30,30,60), BLUE)
-    dn1.draw(surface); up1.draw(surface)
-    result["vol_sfx_dn"].append(dn1); result["vol_sfx_up"].append(up1)
-    # music row
-    mu_v = cfg.get("music_volume", 0.45)
-    mu_txt = C.FONT_SMALL.render(f"MUSIC {int(mu_v*100):>3}%", True, WHITE)
-    surface.blit(mu_txt, (col_x + 20, sec_y3 + 86))
-    dn2 = Button((col_x + 240, sec_y3 + 82, 36, 30), "◀", (30,30,60), BLUE)
-    up2 = Button((col_x + 284, sec_y3 + 82, 36, 30), "▶", (30,30,60), BLUE)
-    dn2.draw(surface); up2.draw(surface)
-    result["vol_music_dn"].append(dn2); result["vol_music_up"].append(up2)
+    mu_v  = cfg.get("music_volume", 0.45)
+    sliders = []
+    for i, (label, val, key) in enumerate([("SFX", sfx_v, "sfx_volume"),
+                                            ("MUSIC", mu_v, "music_volume")]):
+        row_y   = sec_y3 + 48 + i * 52
+        lbl_s   = C.FONT_SMALL.render(f"{label}  {int(val*100):>3}%", True, WHITE)
+        surface.blit(lbl_s, (col_x + 20, row_y))
+        track_x = col_x + 160
+        track_y = row_y + 8
+        track_w = 280
+        track_h = 6
+        thumb_r = 9
+        # track background
+        pygame.draw.rect(surface, (40, 42, 65), (track_x, track_y, track_w, track_h), border_radius=3)
+        # filled portion
+        filled_w = int(track_w * val)
+        pygame.draw.rect(surface, CYAN, (track_x, track_y, filled_w, track_h), border_radius=3)
+        # thumb
+        thumb_x = track_x + filled_w
+        pygame.draw.circle(surface, WHITE, (thumb_x, track_y + track_h//2), thumb_r)
+        pygame.draw.circle(surface, CYAN,  (thumb_x, track_y + track_h//2), thumb_r - 2)
+        sliders.append({
+            "key":     key,
+            "track_x": track_x, "track_y": track_y,
+            "track_w": track_w, "track_h": track_h,
+            "thumb_r": thumb_r,
+            "rect":    pygame.Rect(track_x - thumb_r, track_y - thumb_r,
+                                   track_w + thumb_r*2, track_h + thumb_r*2),
+        })
+    result["sliders"] = sliders
 
     # TRAIL STYLE picker
     _panel(surface, pygame.Rect(trail_x, sec_y2, 340, 310))
