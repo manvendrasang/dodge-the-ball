@@ -54,61 +54,75 @@ def draw_main_menu(surface):
     # background + grid drawn by MenuAnimator before this call
     title = C.FONT_TITLE.render("DODGE THE BALL", True, CYAN)
     glow  = C.FONT_TITLE.render("DODGE THE BALL", True, (0, 80, 100))
+    tx = C.WIDTH//2 - title.get_width()//2
     for off in [(-2,2),(2,2),(-2,-2),(2,-2)]:
-        surface.blit(glow, (C.WIDTH//2 - title.get_width()//2 + off[0], 72 + off[1]))
-    surface.blit(title, (C.WIDTH//2 - title.get_width()//2, 72))
-    bw, bh, gap = 300, 58, 16
+        surface.blit(glow, (tx + off[0], 60 + off[1]))
+    surface.blit(title, (tx, 60))
+    bw, bh, gap = 300, 56, 14
     cx = C.WIDTH//2 - bw//2
-    y0 = C.HEIGHT//2 - (bh*3 + gap*2)//2 + 20
+    # vertically center button group in remaining space below title
+    total_h = bh * 4 + gap * 3 + 20
+    y0 = max(180, C.HEIGHT//2 - total_h//2 + 30)
     buttons = [
-        Button((cx, y0,           bw, bh), "Play",        (20,90,40),   (40,210,90),   WHITE),
-        Button((cx, y0+bh+gap,    bw, bh), "Leaderboard", (30,34,70),   BTN_LEADER_H,  CYAN),
-        Button((cx, y0+(bh+gap)*2,bw, bh), "Settings",    (25,40,60),   (40,100,160),  WHITE),
-        Button((cx, y0+(bh+gap)*3+14,bw,bh),"Quit",       BTN_QUIT,     BTN_QUIT_H,    RED),
+        Button((cx, y0,              bw, bh), "Play",        (20,90,40),  (40,210,90),  WHITE),
+        Button((cx, y0+bh+gap,       bw, bh), "Leaderboard", (30,34,70),  BTN_LEADER_H, CYAN),
+        Button((cx, y0+(bh+gap)*2,   bw, bh), "Settings",    (25,40,60),  (40,100,160), WHITE),
+        Button((cx, y0+(bh+gap)*3+14,bw, bh), "Quit",        BTN_QUIT,    BTN_QUIT_H,   RED),
     ]
     for b in buttons: b.draw(surface)
-    # personal bests panel
-    pb_x = C.WIDTH - 240
-    _panel(surface, pygame.Rect(pb_x - 10, y0, 230, 112))
+    # personal bests — right side, vertically aligned with button group
+    pb_w = 220
+    pb_x = C.WIDTH - pb_w - 40
+    pb_h = 30 + len(MODES) * 28
+    _panel(surface, pygame.Rect(pb_x - 10, y0, pb_w + 20, pb_h + 16))
     pb_title = C.FONT_SMALL.render("PERSONAL BESTS", True, DIM)
     surface.blit(pb_title, (pb_x, y0 + 8))
     for i, mode in enumerate(MODES):
         pb  = get_personal_best(mode)
         col = YELLOW if pb else DIM
         txt = C.FONT_SMALL.render(f"{mode.upper():<10} {pb}", True, col)
-        surface.blit(txt, (pb_x, y0 + 30 + i * 26))
+        surface.blit(txt, (pb_x, y0 + 30 + i * 28))
     return buttons
 
 
 def draw_mode_select(surface):
     title = C.FONT_TITLE.render("DODGE THE BALL", True, CYAN)
     glow  = C.FONT_TITLE.render("DODGE THE BALL", True, (0, 80, 100))
+    tx = C.WIDTH//2 - title.get_width()//2
     for off in [(-2,2),(2,2),(-2,-2),(2,-2)]:
-        surface.blit(glow, (C.WIDTH//2 - title.get_width()//2 + off[0], 72 + off[1]))
-    surface.blit(title, (C.WIDTH//2 - title.get_width()//2, 72))
+        surface.blit(glow, (tx + off[0], 60 + off[1]))
+    surface.blit(title, (tx, 60))
     sub = C.FONT_HUD.render("SELECT GAME MODE", True, DIM)
-    surface.blit(sub, (C.WIDTH//2 - sub.get_width()//2, 172))
-    bw, bh, gap = 340, 64, 18
+    surface.blit(sub, (C.WIDTH//2 - sub.get_width()//2, 158))
+    bw, bh, gap = 320, 62, 16
     cx = C.WIDTH//2 - bw//2
-    y0 = C.HEIGHT//2 - (bh*3 + gap*2)//2 + 20
-    # mode descriptions
+    total_h = bh * 3 + gap * 2
+    y0 = max(200, C.HEIGHT//2 - total_h//2 + 10)
     descs = {
-        "Classic":     "Dodge balls, collect squares",
-        "Shrink Zone": "Zone shrinks over time",
-        "Hardcore":    "Walls, homing balls, no mercy",
+        "Classic":     "Dodge balls · collect squares",
+        "Shrink Zone": "Zone shrinks over time · powerups",
+        "Hardcore":    "Walls · homing balls · no mercy",
     }
-    buttons = [
-        Button((cx, y0,           bw, bh), "Classic",     (20,60,120),  (40,130,255),  WHITE),
-        Button((cx, y0+bh+gap,    bw, bh), "Shrink Zone", (60,20,100),  (160,40,255),  WHITE),
-        Button((cx, y0+(bh+gap)*2,bw, bh), "Hardcore",    (100,20,20),  (255,40,40),   WHITE),
+    mode_data = [
+        ("Classic",     (20,60,120),  (40,130,255)),
+        ("Shrink Zone", (60,20,100),  (160,40,255)),
+        ("Hardcore",    (100,20,20),  (255,40,40)),
     ]
-    for btn in buttons:
-        btn.draw(surface)
-        desc = descs.get(btn.label, "")
-        d_lbl = C.FONT_SMALL.render(desc, True, DIM)
-        surface.blit(d_lbl, (cx + bw + 18, btn.rect.centery - d_lbl.get_height()//2))
-    # back button bottom-left
-    back = Button((cx - bw//2 - 20, y0 + (bh+gap)*3 + 10, 160, 44), "← Back", (30,34,70), BTN_LEADER_H, CYAN)
+    buttons = []
+    for i, (lbl, bg, hov) in enumerate(mode_data):
+        by = y0 + i * (bh + gap)
+        b  = Button((cx, by, bw, bh), lbl, bg, hov, WHITE)
+        b.draw(surface)
+        buttons.append(b)
+        # description panel right of button
+        desc_x = cx + bw + 24
+        desc_w = C.WIDTH - desc_x - 40
+        _panel(surface, pygame.Rect(desc_x, by, desc_w, bh))
+        d_lbl = C.FONT_SMALL.render(descs[lbl], True, (160, 162, 190))
+        surface.blit(d_lbl, (desc_x + 16, by + bh//2 - d_lbl.get_height()//2))
+    # back button centered below mode buttons
+    back_y = y0 + total_h + 24
+    back = Button((C.WIDTH//2 - 100, back_y, 200, 46), "← Back", (30,34,70), BTN_LEADER_H, CYAN)
     back.draw(surface)
     return buttons, back
 
@@ -355,152 +369,134 @@ def draw_pause(surface) -> list:
 
 
 def draw_settings(surface, cfg: dict) -> dict:
-    """
-    Draw the settings screen.
-    Returns dict of named button lists for the caller to handle:
-    { "back": [...], "toggle_fs": [...], "colors": [...], "vol_sfx": [...], "vol_music": [...], "trails": [...] }
-    """
     from settings import PLAYER_COLORS
     from trails import TRAIL_DEFS, get_unlocked, get_active
     surface.fill(C.BG)
     for x in range(0, C.WIDTH, 60):
         pygame.draw.line(surface, (18, 20, 34), (x, 0), (x, C.HEIGHT))
     for y in range(0, C.HEIGHT, 60):
-        pygame.draw.line(surface, (18, 20, 34), (0, y), (0+C.WIDTH, y))
+        pygame.draw.line(surface, (18, 20, 34), (0, y), (C.WIDTH, y))
 
     title = C.FONT_BIG.render("SETTINGS", True, CYAN)
-    surface.blit(title, (C.WIDTH//2 - title.get_width()//2, 28))
+    surface.blit(title, (C.WIDTH//2 - title.get_width()//2, 22))
 
     result = {"back": [], "toggle_fs": [], "colors": [], "trails": [], "sliders": []}
 
-    col_x  = C.WIDTH//2 - 540
-    trail_x = C.WIDTH//2 + 60
-    mid_x  = C.WIDTH//2 - 200
-    sec_y  = 100
+    # layout: two columns centered on screen
+    total_w = 1020
+    left_x  = C.WIDTH//2 - total_w//2
+    right_x = left_x + 520
+    col_w_l = 480
+    col_w_r = 480
+    y = 100
 
-    # FULLSCREEN toggle
-    _panel(surface, pygame.Rect(mid_x, sec_y, 400, 68))
+    # FULLSCREEN toggle — spans both columns, centered
+    fs_w = 440
+    fs_x = C.WIDTH//2 - fs_w//2
+    _panel(surface, pygame.Rect(fs_x, y, fs_w, 60))
     fs_lbl = C.FONT_HUD.render("FULLSCREEN", True, WHITE)
-    surface.blit(fs_lbl, (mid_x + 20, sec_y + 10))
+    surface.blit(fs_lbl, (fs_x + 20, y + 16))
     fs_state = "ON" if cfg.get("fullscreen", True) else "OFF"
     fs_col   = GREEN if cfg.get("fullscreen") else RED
-    fs_btn   = Button((mid_x + 260, sec_y + 10, 110, 40), fs_state, fs_col,
+    fs_btn   = Button((fs_x + fs_w - 130, y + 10, 110, 40), fs_state, fs_col,
                     tuple(min(255, v+60) for v in fs_col))
     fs_btn.draw(surface)
     result["toggle_fs"].append(fs_btn)
 
-    # PLAYER COLOR picker
-    sec_y2 = sec_y + 100
-    _panel(surface, pygame.Rect(col_x, sec_y2, 480, 180))
+    y += 82
+
+    # PLAYER COLOR — left column
+    pc_h = 200
+    _panel(surface, pygame.Rect(left_x, y, col_w_l, pc_h))
     lbl = C.FONT_HUD.render("PLAYER COLOR", True, WHITE)
-    surface.blit(lbl, (col_x + 20, sec_y2 + 12))
+    surface.blit(lbl, (left_x + 20, y + 14))
     active_idx = cfg.get("player_color", 0)
-    swatch_x = col_x + 20
-    swatch_y = sec_y2 + 48
+    sw, sw_gap = 42, 12
+    row_start_x = left_x + 20
+    swatch_y = y + 52
     for i, pc in enumerate(PLAYER_COLORS):
-        col   = pc["color"]
-        sw    = 42
-        gap   = 14
-        bx    = swatch_x + i * (sw + gap)
-        by    = swatch_y
-        # two rows of 4
-        if i >= 4:
-            bx = swatch_x + (i-4) * (sw + gap)
-            by = swatch_y + sw + 10
+        col    = pc["color"]
+        bx     = row_start_x + (i % 4) * (sw + sw_gap)
+        by     = swatch_y + (i // 4) * (sw + 10)
         selected = (i == active_idx)
-        # glow for selected
         if selected:
             gs = pygame.Surface((sw+12, sw+12), pygame.SRCALPHA)
-            pygame.draw.rect(gs, (*col, 80), (0, 0, sw+12, sw+12), border_radius=8)
+            pygame.draw.rect(gs, (*col, 80), (0,0,sw+12,sw+12), border_radius=8)
             surface.blit(gs, (bx-6, by-6))
-        pygame.draw.rect(surface, col,   (bx, by, sw, sw), border_radius=6)
+        pygame.draw.rect(surface, col, (bx, by, sw, sw), border_radius=6)
         pygame.draw.rect(surface, WHITE if selected else DIM, (bx, by, sw, sw), 2, border_radius=6)
         b = Button((bx, by, sw, sw), "", col, tuple(min(255,v+60) for v in col))
         result["colors"].append((b, i))
-
-    # draw all color swatches as clickable (no text)
+    # selected color name + preview dot on same row
     name_txt = C.FONT_SMALL.render(PLAYER_COLORS[active_idx]["name"], True, YELLOW)
-    surface.blit(name_txt, (col_x + 20, sec_y2 + 148))
+    name_y   = y + pc_h - 32
+    surface.blit(name_txt, (left_x + 20, name_y))
+    prev_col = PLAYER_COLORS[active_idx]["color"]
+    pygame.draw.circle(surface, prev_col, (left_x + col_w_l - 30, name_y + 10), 12)
+    pygame.draw.circle(surface, WHITE,    (left_x + col_w_l - 30, name_y + 10), 12, 2)
 
-    # VOLUME sliders
-    sec_y3 = sec_y2 + 200
-    _panel(surface, pygame.Rect(col_x, sec_y3, 480, 150))
+    # VOLUME sliders — left column below color
+    vol_y = y + pc_h + 18
+    _panel(surface, pygame.Rect(left_x, vol_y, col_w_l, 130))
     vol_lbl = C.FONT_HUD.render("VOLUME", True, WHITE)
-    surface.blit(vol_lbl, (col_x + 20, sec_y3 + 10))
-    sfx_v = cfg.get("sfx_volume", 0.7)
-    mu_v  = cfg.get("music_volume", 0.45)
+    surface.blit(vol_lbl, (left_x + 20, vol_y + 12))
     sliders = []
-    for i, (label, val, key) in enumerate([("SFX", sfx_v, "sfx_volume"),
-                                            ("MUSIC", mu_v, "music_volume")]):
-        row_y   = sec_y3 + 48 + i * 52
+    for i, (label, val, key) in enumerate([("SFX",   cfg.get("sfx_volume",   0.7),  "sfx_volume"),
+                                            ("MUSIC", cfg.get("music_volume", 0.45), "music_volume")]):
+        row_y   = vol_y + 50 + i * 46
         lbl_s   = C.FONT_SMALL.render(f"{label}  {int(val*100):>3}%", True, WHITE)
-        surface.blit(lbl_s, (col_x + 20, row_y))
-        track_x = col_x + 160
+        surface.blit(lbl_s, (left_x + 20, row_y))
+        track_x = left_x + 140
         track_y = row_y + 8
-        track_w = 280
+        track_w = col_w_l - 160
         track_h = 6
         thumb_r = 9
-        # track background
-        pygame.draw.rect(surface, (40, 42, 65), (track_x, track_y, track_w, track_h), border_radius=3)
-        # filled portion
+        pygame.draw.rect(surface, (40,42,65), (track_x, track_y, track_w, track_h), border_radius=3)
         filled_w = int(track_w * val)
-        pygame.draw.rect(surface, CYAN, (track_x, track_y, filled_w, track_h), border_radius=3)
-        # thumb
+        pygame.draw.rect(surface, CYAN, (track_x, track_y, max(0,filled_w), track_h), border_radius=3)
         thumb_x = track_x + filled_w
         pygame.draw.circle(surface, WHITE, (thumb_x, track_y + track_h//2), thumb_r)
         pygame.draw.circle(surface, CYAN,  (thumb_x, track_y + track_h//2), thumb_r - 2)
-        sliders.append({
-            "key":     key,
-            "track_x": track_x, "track_y": track_y,
-            "track_w": track_w, "track_h": track_h,
-            "thumb_r": thumb_r,
-            "rect":    pygame.Rect(track_x - thumb_r, track_y - thumb_r,
-                                track_w + thumb_r*2, track_h + thumb_r*2),
-        })
+        sliders.append({"key": key, "track_x": track_x, "track_y": track_y,
+                        "track_w": track_w, "track_h": track_h, "thumb_r": thumb_r,
+                        "rect": pygame.Rect(track_x - thumb_r, track_y - thumb_r,
+                                            track_w + thumb_r*2, track_h + thumb_r*2)})
     result["sliders"] = sliders
 
-    # TRAIL STYLE picker
-    _panel(surface, pygame.Rect(trail_x, sec_y2, 340, 310))
+    # TRAIL STYLE — right column
+    trail_h = pc_h + 18 + 130
+    _panel(surface, pygame.Rect(right_x, y, col_w_r, trail_h))
     trl = C.FONT_HUD.render("TRAIL STYLE", True, WHITE)
-    surface.blit(trl, (trail_x + 20, sec_y2 + 12))
-    unlocked = set(get_unlocked())
+    surface.blit(trl, (right_x + 20, y + 14))
+    unlocked     = set(get_unlocked())
     active_trail = get_active()
-    ty = sec_y2 + 50
+    ty = y + 54
+    tbw, tbh = col_w_r - 40, 38
+    tbx = right_x + 20
     for td in TRAIL_DEFS:
         locked = td["id"] not in unlocked
         is_act = (td["id"] == active_trail)
         if locked:
-            bg   = (22, 22, 38); hov = (22, 22, 38); tc = DIM
-            txt  = f"{td['name']}  @ {td['unlock']}"
+            bg = (22,22,38); hov = (22,22,38); tc = DIM
+            txt = f"{td['name']}  @ {td['unlock']}"
         else:
-            bg   = (20,80,30) if is_act else (28,30,55)
-            hov  = GREEN if is_act else (60,80,160)
-            tc   = WHITE
-            txt  = td["name"] + (" ✓" if is_act else "")
-        b = Button((trail_x+20, ty, 300, 38), txt, bg, hov, tc)
+            bg  = (20,80,30) if is_act else (28,30,55)
+            hov = GREEN if is_act else (60,80,160)
+            tc  = WHITE
+            txt = td["name"] + (" ✓" if is_act else "")
+        b = Button((tbx, ty, tbw, tbh), txt, bg, hov, tc)
         if not locked:
             b.draw(surface)
         else:
-            pygame.draw.rect(surface, bg, (trail_x+20, ty, 300, 38), border_radius=6)
-            pygame.draw.rect(surface, (35,35,55), (trail_x+20, ty, 300, 38), 1, border_radius=6)
+            pygame.draw.rect(surface, bg, (tbx, ty, tbw, tbh), border_radius=6)
+            pygame.draw.rect(surface, (35,35,55), (tbx, ty, tbw, tbh), 1, border_radius=6)
             ll = C.FONT_SMALL.render(txt, True, DIM)
-            surface.blit(ll, (trail_x+20+150-ll.get_width()//2, ty+10))
+            surface.blit(ll, (tbx + tbw//2 - ll.get_width()//2, ty + tbh//2 - ll.get_height()//2))
         result["trails"].append((b, td["id"], locked))
-        ty += 46
+        ty += tbh + 10
 
-    # BACK button
+    # BACK button — centered at bottom
     bk = Button((C.WIDTH//2 - 120, C.HEIGHT - 68, 240, 48), "Back to Menu", (30,34,70), BTN_LEADER_H, CYAN)
     bk.draw(surface)
     result["back"].append(bk)
-
-    # player preview dot — shown inside color panel, right side
-    preview_col = PLAYER_COLORS[active_idx]["color"]
-    dot_cx = col_x + 440
-    dot_cy = sec_y2 + 148 + 10
-    gs2 = pygame.Surface((36, 36), pygame.SRCALPHA)
-    pygame.draw.circle(gs2, (*preview_col, 60), (18, 18), 18)
-    surface.blit(gs2, (dot_cx - 18, dot_cy - 18))
-    pygame.draw.circle(surface, preview_col, (dot_cx, dot_cy), 12)
-    pygame.draw.circle(surface, WHITE,       (dot_cx, dot_cy), 12, 2)
-
     return result
