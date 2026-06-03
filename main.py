@@ -5,7 +5,7 @@ import sys
 import pygame
 import constants as C
 from constants import init_fonts, set_resolution, MODES, FPS
-from ui import draw_main_menu, draw_game_over, draw_leaderboard, draw_settings
+from ui import draw_main_menu, draw_mode_select, draw_game_over, draw_leaderboard, draw_settings
 from modes import run_session
 from menu_anim import MenuAnimator
 from audio import get_audio
@@ -70,22 +70,23 @@ def _toggle_fullscreen():
     save_cfg(cfg)
     flags = pygame.FULLSCREEN if cfg["fullscreen"] else 0
     display = pygame.display.set_mode((SW, SH), flags)
-    _fade_surf = pygame.Surface((SW, SH))
-    _fade_surf.fill((0, 0, 0))
+    _fade_surf = pygame.Surface((SW, SH)); _fade_surf.fill((0, 0, 0))
 
 def _apply_state_change(next_state, pre_callback=None):
     global state
     if pre_callback: pre_callback()
     state = next_state
     if next_state == "game":
-        audio.stop_music()   # only stop when entering a game mode
+        audio.stop_music()
     else:
-        audio.start_music()  # resumes if stopped, skips if already playing
+        audio.start_music()
 
 def _go(next_state, pre_callback=None):
     trans.go(next_state, callback=lambda: _apply_state_change(next_state, pre_callback))
 
-# start music on launch
+def _draw_menu_bg():
+    animator.update(); display.fill(C.BG); animator.draw(display)
+
 audio.start_music()
 
 while True:
@@ -96,10 +97,9 @@ while True:
         ev_list.append(e)
 
     if not trans.busy:
+
         if state == "menu":
-            animator.update()
-            display.fill(C.BG)
-            animator.draw(display)
+            _draw_menu_bg()
             menu_buttons = draw_main_menu(display)
             for ev in ev_list:
                 if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
@@ -107,13 +107,22 @@ while True:
                 for btn in menu_buttons:
                     if btn.clicked(ev):
                         lbl = btn.label.lower()
-                        if lbl == "quit":
-                            pygame.quit(); sys.exit()
+                        if   lbl == "quit":        pygame.quit(); sys.exit()
                         elif lbl == "leaderboard": _go("leaderboard")
                         elif lbl == "settings":    _go("settings")
-                        elif lbl in ("classic", "shrink zone", "hardcore"):
-                            current_mode = lbl.replace(" zone", "")
-                            _go("game")
+                        elif lbl == "play":        _go("mode_select")
+
+        elif state == "mode_select":
+            _draw_menu_bg()
+            mode_buttons, back_btn = draw_mode_select(display)
+            for ev in ev_list:
+                if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
+                    _go("menu")
+                if back_btn.clicked(ev): _go("menu")
+                for btn in mode_buttons:
+                    if btn.clicked(ev):
+                        current_mode = btn.label.lower().replace(" zone", "")
+                        _go("game")
 
         elif state == "game":
             last_score, last_stats = run_session(current_mode, display, clock)
@@ -124,8 +133,8 @@ while True:
             over_buttons = draw_game_over(display, last_score, current_mode, last_stats)
             for ev in ev_list:
                 if ev.type == pygame.KEYDOWN:
-                    if ev.key == pygame.K_r:                         _go("game")
-                    if ev.key in (pygame.K_m, pygame.K_ESCAPE):      _go("menu")
+                    if ev.key == pygame.K_r:                    _go("game")
+                    if ev.key in (pygame.K_m, pygame.K_ESCAPE): _go("menu")
                 for btn in over_buttons:
                     if btn.clicked(ev):
                         lbl = btn.label.lower()
@@ -168,17 +177,16 @@ while True:
                 from trails import set_active
                 for btn, trail_id, locked in btns["trails"]:
                     if not locked and btn.clicked(ev): set_active(trail_id)
+
     else:
         # keep drawing current state behind the fade
-        if state == "menu":
-            animator.update(); display.fill(C.BG)
-            animator.draw(display); draw_main_menu(display)
-        elif state == "gameover":
-            draw_game_over(display, last_score, current_mode, last_stats)
-        elif state == "leaderboard":
-            draw_leaderboard(display, lb_tab)
-        elif state == "settings":
-            draw_settings(display, load_cfg())
+        if state in ("menu", "mode_select"):
+            _draw_menu_bg()
+            if state == "menu":       draw_main_menu(display)
+            else:                     draw_mode_select(display)
+        elif state == "gameover":     draw_game_over(display, last_score, current_mode, last_stats)
+        elif state == "leaderboard":  draw_leaderboard(display, lb_tab)
+        elif state == "settings":     draw_settings(display, load_cfg())
 
     trans.update()
     trans.draw(display)

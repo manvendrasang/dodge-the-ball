@@ -1,4 +1,4 @@
-# pylint: disable=missing-module-docstring, missing-function-docstring, global-statement, unused-wildcard-import, line-too-long
+# pylint: disable=missing-module-docstring, missing-function-docstring, global-statement, unused-wildcard-import, line-too-long, superfluous-parens
 # pylint: disable=missing-class-docstring, no-member, no-name-in-module, multiple-statements, unused-variable, unused-import
 
 import pygame
@@ -51,40 +51,66 @@ def _panel(surface, rect, alpha=180):
 
 
 def draw_main_menu(surface):
-    # background + grid drawn by MenuAnimator in main.py before this call
-    # title
+    # background + grid drawn by MenuAnimator before this call
     title = C.FONT_TITLE.render("DODGE THE BALL", True, CYAN)
-    # glow behind title
-    glow = C.FONT_TITLE.render("DODGE THE BALL", True, (0, 80, 100))
+    glow  = C.FONT_TITLE.render("DODGE THE BALL", True, (0, 80, 100))
+    for off in [(-2,2),(2,2),(-2,-2),(2,-2)]:
+        surface.blit(glow, (C.WIDTH//2 - title.get_width()//2 + off[0], 72 + off[1]))
+    surface.blit(title, (C.WIDTH//2 - title.get_width()//2, 72))
+    bw, bh, gap = 300, 58, 16
+    cx = C.WIDTH//2 - bw//2
+    y0 = C.HEIGHT//2 - (bh*3 + gap*2)//2 + 20
+    buttons = [
+        Button((cx, y0,           bw, bh), "Play",        (20,90,40),   (40,210,90),   WHITE),
+        Button((cx, y0+bh+gap,    bw, bh), "Leaderboard", (30,34,70),   BTN_LEADER_H,  CYAN),
+        Button((cx, y0+(bh+gap)*2,bw, bh), "Settings",    (25,40,60),   (40,100,160),  WHITE),
+        Button((cx, y0+(bh+gap)*3+14,bw,bh),"Quit",       BTN_QUIT,     BTN_QUIT_H,    RED),
+    ]
+    for b in buttons: b.draw(surface)
+    # personal bests panel
+    pb_x = C.WIDTH - 240
+    _panel(surface, pygame.Rect(pb_x - 10, y0, 230, 112))
+    pb_title = C.FONT_SMALL.render("PERSONAL BESTS", True, DIM)
+    surface.blit(pb_title, (pb_x, y0 + 8))
+    for i, mode in enumerate(MODES):
+        pb  = get_personal_best(mode)
+        col = YELLOW if pb else DIM
+        txt = C.FONT_SMALL.render(f"{mode.upper():<10} {pb}", True, col)
+        surface.blit(txt, (pb_x, y0 + 30 + i * 26))
+    return buttons
+
+
+def draw_mode_select(surface):
+    title = C.FONT_TITLE.render("DODGE THE BALL", True, CYAN)
+    glow  = C.FONT_TITLE.render("DODGE THE BALL", True, (0, 80, 100))
     for off in [(-2,2),(2,2),(-2,-2),(2,-2)]:
         surface.blit(glow, (C.WIDTH//2 - title.get_width()//2 + off[0], 72 + off[1]))
     surface.blit(title, (C.WIDTH//2 - title.get_width()//2, 72))
     sub = C.FONT_HUD.render("SELECT GAME MODE", True, DIM)
-    surface.blit(sub, (C.WIDTH//2 - sub.get_width()//2, 178))
-    bw, bh, gap = 300, 52, 14
+    surface.blit(sub, (C.WIDTH//2 - sub.get_width()//2, 172))
+    bw, bh, gap = 340, 64, 18
     cx = C.WIDTH//2 - bw//2
-    y0 = 220
+    y0 = C.HEIGHT//2 - (bh*3 + gap*2)//2 + 20
+    # mode descriptions
+    descs = {
+        "Classic":     "Dodge balls, collect squares",
+        "Shrink Zone": "Zone shrinks over time",
+        "Hardcore":    "Walls, homing balls, no mercy",
+    }
     buttons = [
         Button((cx, y0,           bw, bh), "Classic",     (20,60,120),  (40,130,255),  WHITE),
         Button((cx, y0+bh+gap,    bw, bh), "Shrink Zone", (60,20,100),  (160,40,255),  WHITE),
         Button((cx, y0+(bh+gap)*2,bw, bh), "Hardcore",    (100,20,20),  (255,40,40),   WHITE),
-        Button((cx, y0+(bh+gap)*3+10,bw,bh),"Leaderboard",(30,34,70),   BTN_LEADER_H,  CYAN),
-        Button((cx, y0+(bh+gap)*4+10,bw,bh),"Settings",   (25,40,60),   (40,100,160),  WHITE),
-        Button((cx, y0+(bh+gap)*5+10,bw,bh),"Quit",       BTN_QUIT,     BTN_QUIT_H,    RED),
     ]
-    for b in buttons:
-        b.draw(surface)
-    # personal bests panel
-    pb_x = C.WIDTH - 230
-    _panel(surface, pygame.Rect(pb_x - 10, 218, 220, 100))
-    pb_title = C.FONT_SMALL.render("PERSONAL BESTS", True, DIM)
-    surface.blit(pb_title, (pb_x, 224))
-    for i, mode in enumerate(MODES):
-        pb = get_personal_best(mode)
-        col = YELLOW if pb else DIM
-        txt = C.FONT_SMALL.render(f"{mode.upper():<10} {pb}", True, col)
-        surface.blit(txt, (pb_x, 244 + i*24))
-    return buttons
+    for btn in buttons:
+        btn.draw(surface)
+        desc = descs.get(btn.label, "")
+        d_lbl = C.FONT_SMALL.render(desc, True, DIM)
+        surface.blit(d_lbl, (cx + bw + 18, btn.rect.centery - d_lbl.get_height()//2))
+    # back button bottom-left
+    back = Button((cx - bw//2 - 20, y0 + (bh+gap)*3 + 10, 160, 44), "← Back", (30,34,70), BTN_LEADER_H, CYAN)
+    back.draw(surface)
+    return buttons, back
 
 
 def draw_game_over(surface, score, mode, stats=None):
