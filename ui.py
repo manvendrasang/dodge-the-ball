@@ -141,7 +141,7 @@ def draw_game_over(surface, score, mode, stats=None):
             surface.blit(val_s, (px_ + pw - val_s.get_width() - 18, ry))
             if i < len(rows) - 1:
                 pygame.draw.line(surface, (35, 37, 60),
-                                 (px_+18, ry+32), (px_+pw-18, ry+32))
+                                (px_+18, ry+32), (px_+pw-18, ry+32))
     # buttons
     btn_y = 268 + (30 + max(4, len(stats and [1]*4 or [])) * 38) + 20 if stats else 340
     bw, bh, gap = 240, 46, 10
@@ -174,9 +174,9 @@ def draw_leaderboard(surface, active_tab_idx):
         tx = tab_start + i*(tab_w+10)
         active = i == active_tab_idx
         b = Button((tx, 86, tab_w, tab_h), lbl,
-                   fg if active else bg,
-                   fg,
-                   DARK if active else WHITE)
+                fg if active else bg,
+                fg,
+                DARK if active else WHITE)
         b.draw(surface)
         tab_buttons.append(b)
     mode    = MODES[active_tab_idx]
@@ -201,7 +201,7 @@ def draw_leaderboard(surface, active_tab_idx):
         surface.blit(sc_txt,   (C.WIDTH//2 - 200, y))
         surface.blit(ts_txt,   (C.WIDTH//2 + 20,  y + 4))
         pygame.draw.line(surface, (28, 30, 50),
-                         (C.WIDTH//2 - 300, y + 34), (C.WIDTH//2 + 300, y + 34))
+                        (C.WIDTH//2 - 300, y + 34), (C.WIDTH//2 + 300, y + 34))
         y += 38
     if not entries:
         empty = C.FONT_HUD.render("No scores recorded yet", True, DIM)
@@ -230,7 +230,7 @@ def draw_hud(surface, score, mode, active_pus, lives=None, shield=False, combo=0
         lv_txt = C.FONT_HUD.render(f"{'♥' * (lives+1)}", True, RED)
         surface.blit(lv_txt, (C.WIDTH - lv_txt.get_width() - 14, 38))
     if shield:
-        sh = C.FONT_SMALL.render("◈  SHIELD ACTIVE", True, GREEN)
+        sh = C.FONT_SMALL.render("◈  SHIELD BASH ACTIVE", True, GREEN)
         surface.blit(sh, (C.WIDTH//2 - sh.get_width()//2, 12))
     if PU_GHOST in active_pus:
         gh = C.FONT_SMALL.render("◌  GHOST ACTIVE", True, (200, 200, 255))
@@ -329,7 +329,7 @@ def draw_settings(surface, cfg: dict) -> dict:
     """
     Draw the settings screen.
     Returns dict of named button lists for the caller to handle:
-      { "back": [...], "toggle_fs": [...], "colors": [...], "vol_sfx": [...], "vol_music": [...], "trails": [...] }
+    { "back": [...], "toggle_fs": [...], "colors": [...], "vol_sfx": [...], "vol_music": [...], "trails": [...] }
     """
     from settings import PLAYER_COLORS
     from trails import TRAIL_DEFS, get_unlocked, get_active
@@ -356,7 +356,7 @@ def draw_settings(surface, cfg: dict) -> dict:
     fs_state = "ON" if cfg.get("fullscreen", True) else "OFF"
     fs_col   = GREEN if cfg.get("fullscreen") else RED
     fs_btn   = Button((mid_x + 260, sec_y + 10, 110, 40), fs_state, fs_col,
-                      tuple(min(255, v+60) for v in fs_col))
+                    tuple(min(255, v+60) for v in fs_col))
     fs_btn.draw(surface)
     result["toggle_fs"].append(fs_btn)
 
@@ -426,7 +426,7 @@ def draw_settings(surface, cfg: dict) -> dict:
             "track_w": track_w, "track_h": track_h,
             "thumb_r": thumb_r,
             "rect":    pygame.Rect(track_x - thumb_r, track_y - thumb_r,
-                                   track_w + thumb_r*2, track_h + thumb_r*2),
+                                track_w + thumb_r*2, track_h + thumb_r*2),
         })
     result["sliders"] = sliders
 

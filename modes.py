@@ -42,8 +42,8 @@ def _make_ball(score, mode):
             base_speed = spd
     heavy  = random.random() < HEAVY_CHANCE
     homing = (mode == "hardcore" and
-              score >= HOMING_ACTIVATE_SCORE and
-              random.random() < HOMING_CHANCE)
+            score >= HOMING_ACTIVATE_SCORE and
+            random.random() < HOMING_CHANCE)
     b = Ball(base_speed, homing=homing, heavy=heavy)
     b.set_position_random_edge()
     return b
@@ -89,6 +89,7 @@ class GameSession:
         self._trail_fn     = get_color_fn(self._trail_id)
         self._unlock_notif = []
         self._player_color = get_player_color()
+        self._bash_particles = []  # shield bash destruction bursts
         # stats
         self.stat_frames         = 0   # total frames alive → time survived
         self.stat_balls_dodged   = 0   # incremented each frame no collision occurs
@@ -169,16 +170,30 @@ class GameSession:
         if len(self._trail) > TRAIL_LEN:
             self._trail.pop(0)
 
-        # update balls
+        # update balls - check shield bash before death
+        bashed = []
         for b in self.balls:
             b.update_speed(self.score, self.mode)
             b.move(ppos, zone)
-            if not self.ghost_active and b.collides_with_player(*ppos, P_RADIUS):
-                self.handle_death()
-                if self.dead:
-                    return
+            if b.collides_with_player(*ppos, P_RADIUS):
+                if self.shield:
+                    bashed.append(b)
+                elif not self.ghost_active:
+                    self.handle_death()
+                    if self.dead:
+                        return
+        for b in bashed:
+            self.balls.remove(b)
+            self._spawn_bash_burst(b.x, b.y, b.color, b.r)
+            # respawn a new ball so count stays consistent
+            self.balls.append(_make_ball(self.score, self.mode))
 
-        # combo timer tick
+        # tick bash particles
+        for p in self._bash_particles:
+            p["x"] += p["vx"]; p["y"] += p["vy"]
+            p["vy"] += 0.18    # slight gravity
+            p["life"] -= 1
+        self._bash_particles = [p for p in self._bash_particles if p["life"] > 0]
         if self._combo_timer > 0:
             self._combo_timer -= 1
             if self._combo_timer == 0:
@@ -278,6 +293,22 @@ class GameSession:
                 self._shrink_timer = SHRINK_INTERVAL
                 self._do_shrink()
 
+    def _spawn_bash_burst(self, x, y, color, radius):
+        """Spawn particle burst when a ball is shield-bashed."""
+        import random as _r
+        get_audio().play("collect")
+        for _ in range(14):
+            angle  = _r.uniform(0, 360)
+            speed  = _r.uniform(2.5, 6.5)
+            size   = _r.randint(3, max(4, radius // 2))
+            self._bash_particles.append({
+                "x": x, "y": y,
+                "vx": speed * math.cos(math.radians(angle)),
+                "vy": speed * math.sin(math.radians(angle)),
+                "r": size, "color": color,
+                "life": _r.randint(18, 30), "max_life": 30,
+            })
+
     def _do_shrink(self):
         zr    = self.zone_rect
         new_w = zr.width  - SHRINK_STEP * 2
@@ -285,7 +316,7 @@ class GameSession:
         if new_w < SHRINK_MIN_SIZE or new_h < SHRINK_MIN_SIZE:
             return
         self.zone_rect = pygame.Rect(zr.x + SHRINK_STEP, zr.y + SHRINK_STEP, new_w, new_h)
-        self._zone_overlay = None  # invalidate cached overlay
+        self._zone_overlay = None
         self.effects.trigger_shrink_alert()
         get_audio().play("shrink")
         self.stat_shrinks += 1
@@ -319,6 +350,14 @@ class GameSession:
 
         for w in self.walls:
             w.draw(game_surf)
+        # bash particles drawn under balls
+        for p in self._bash_particles:
+            frac  = p["life"] / p["max_life"]
+            alpha = int(220 * frac)
+            r     = max(1, int(p["r"] * frac))
+            ps    = pygame.Surface((r*2+2, r*2+2), pygame.SRCALPHA)
+            pygame.draw.circle(ps, (*p["color"], alpha), (r+1, r+1), r)
+            game_surf.blit(ps, (int(p["x"]) - r - 1, int(p["y"]) - r - 1))
         for b in self.balls:
             b.draw(game_surf)
         for pu in self.powerups:
@@ -334,7 +373,7 @@ class GameSession:
             halo_r = int(P_RADIUS * 2.5 + pulse * 6)
             halo_s = pygame.Surface((halo_r*2, halo_r*2), pygame.SRCALPHA)
             pygame.draw.circle(halo_s, (200, 200, 255, int(50 + pulse * 60)),
-                               (halo_r, halo_r), halo_r)
+                            (halo_r, halo_r), halo_r)
             game_surf.blit(halo_s, (ppos[0] - halo_r, ppos[1] - halo_r))
             ghost_s = pygame.Surface((P_RADIUS*2+2, P_RADIUS*2+2), pygame.SRCALPHA)
             alpha   = int(80 + pulse * 80)
@@ -350,7 +389,7 @@ class GameSession:
 
         lives_arg = self.lives if self.mode == "hardcore" else None
         draw_hud(game_surf, self.score, self.mode, self.active_pu, lives_arg, self.shield,
-                 self.combo, self._combo_timer, self.level)
+                self.combo, self._combo_timer, self.level)
         # draw floating score popups
         for p in self._popups:
             frac  = p["life"] / p["max_life"]
