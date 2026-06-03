@@ -142,14 +142,17 @@ def draw_game_over(surface, score, mode, stats=None):
             if i < len(rows) - 1:
                 pygame.draw.line(surface, (35, 37, 60),
                                 (px_+18, ry+32), (px_+pw-18, ry+32))
-    # buttons
-    btn_y = 268 + (30 + max(4, len(stats and [1]*4 or [])) * 38) + 20 if stats else 340
+    # buttons — anchored to actual panel bottom
+    if stats:
+        panel_bottom = py_ + ph + 18
+    else:
+        panel_bottom = 340
     bw, bh, gap = 240, 46, 10
     cx  = C.WIDTH//2 - bw//2
     buttons = [
-        Button((cx, btn_y,             bw, bh), "[R]  Restart", (20,80,30),  GREEN,     WHITE),
-        Button((cx, btn_y+bh+gap,      bw, bh), "[M]  Menu",    (20,50,100), BLUE,      WHITE),
-        Button((cx, btn_y+(bh+gap)*2,  bw, bh), "[Q]  Quit",    BTN_QUIT,    BTN_QUIT_H, RED),
+        Button((cx, panel_bottom,            bw, bh), "[R]  Restart", (20,80,30),  GREEN,      WHITE),
+        Button((cx, panel_bottom+bh+gap,     bw, bh), "[M]  Menu",    (20,50,100), BLUE,       WHITE),
+        Button((cx, panel_bottom+(bh+gap)*2, bw, bh), "[Q]  Quit",    BTN_QUIT,    BTN_QUIT_H, RED),
     ]
     for b in buttons:
         b.draw(surface)
@@ -172,7 +175,7 @@ def draw_leaderboard(surface, active_tab_idx):
     tab_buttons = []
     for i, (lbl, fg, bg) in enumerate(zip(tab_labels, tab_fg, tab_bg)):
         tx = tab_start + i*(tab_w+10)
-        active = i == active_tab_idx
+        active = (i == active_tab_idx)
         b = Button((tx, 86, tab_w, tab_h), lbl,
                 fg if active else bg,
                 fg,
@@ -305,7 +308,7 @@ def draw_pause(surface) -> list:
             lbl  = f"{td['name']}  (unlock @ {td['unlock']})"
             tcol = DIM
         else:
-            is_active = td["id"] == active
+            is_active = (td["id"] == active)
             col  = (20, 80, 30) if is_active else (28, 30, 55)
             hcol = GREEN if is_active else (60, 80, 160)
             lbl  = td["name"] + (" ✓" if is_active else "")
@@ -378,7 +381,7 @@ def draw_settings(surface, cfg: dict) -> dict:
         if i >= 4:
             bx = swatch_x + (i-4) * (sw + gap)
             by = swatch_y + sw + 10
-        selected = i == active_idx
+        selected = (i == active_idx)
         # glow for selected
         if selected:
             gs = pygame.Surface((sw+12, sw+12), pygame.SRCALPHA)
@@ -439,7 +442,7 @@ def draw_settings(surface, cfg: dict) -> dict:
     ty = sec_y2 + 50
     for td in TRAIL_DEFS:
         locked = td["id"] not in unlocked
-        is_act = td["id"] == active_trail
+        is_act = (td["id"] == active_trail)
         if locked:
             bg   = (22, 22, 38); hov = (22, 22, 38); tc = DIM
             txt  = f"{td['name']}  @ {td['unlock']}"
@@ -464,14 +467,14 @@ def draw_settings(surface, cfg: dict) -> dict:
     bk.draw(surface)
     result["back"].append(bk)
 
-    # player preview dot
+    # player preview dot — shown inside color panel, right side
     preview_col = PLAYER_COLORS[active_idx]["color"]
-    px_ = mid_x + 360
-    py_ = sec_y + 14
-    gs2 = pygame.Surface((40, 40), pygame.SRCALPHA)
-    pygame.draw.circle(gs2, (*preview_col, 50), (20,20), 20)
-    surface.blit(gs2, (px_-20, py_-20))
-    pygame.draw.circle(surface, preview_col, (px_, py_+20), 12)
-    pygame.draw.circle(surface, WHITE,       (px_, py_+20), 12, 2)
+    dot_cx = col_x + 440
+    dot_cy = sec_y2 + 148 + 10
+    gs2 = pygame.Surface((36, 36), pygame.SRCALPHA)
+    pygame.draw.circle(gs2, (*preview_col, 60), (18, 18), 18)
+    surface.blit(gs2, (dot_cx - 18, dot_cy - 18))
+    pygame.draw.circle(surface, preview_col, (dot_cx, dot_cy), 12)
+    pygame.draw.circle(surface, WHITE,       (dot_cx, dot_cy), 12, 2)
 
     return result

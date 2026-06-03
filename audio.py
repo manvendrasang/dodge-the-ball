@@ -117,7 +117,7 @@ def _make_synthwave():
 
     # arp: 16th-note stabs on a minor pentatonic
     arp_notes = [440, 523, 392, 440, 349, 440, 392, 523,
-                 440, 392, 349, 392, 440, 523, 440, 392]
+                440, 392, 349, 392, 440, 523, 440, 392]
     arp = np.zeros(len(t))
     step = beat / 4  # 16th note
     for i, freq in enumerate(arp_notes * bars):
@@ -217,9 +217,9 @@ class AudioManager:
 
     def start_music(self):
         if not self._ready or self._music_sound is None:
-            # retry shortly after build finishes
             threading.Timer(1.0, self.start_music).start()
             return
+        # only start if not already playing — prevents restart on window focus
         if self._music_channel and self._music_channel.get_busy():
             return
         self._music_channel = self._music_sound.play(loops=-1)

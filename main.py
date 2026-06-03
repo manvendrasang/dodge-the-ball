@@ -22,58 +22,32 @@ clock   = pygame.time.Clock()
 set_resolution(SW, SH)
 init_fonts()
 
-# overlay surface reused every frame for transitions
 _fade_surf = pygame.Surface((SW, SH))
 _fade_surf.fill((0, 0, 0))
 
 class Transition:
-    FRAMES = 18  # half-duration (fade out = 18f, fade in = 18f)
-
+    FRAMES = 18
     def __init__(self):
-        self._alpha      = 0
-        self._state      = "idle"   # idle | out | in
-        self._next_state = None
-        self._callback   = None     # called at peak black (between out and in)
-
+        self._alpha = 0; self._state = "idle"
+        self._next_state = None; self._callback = None
     @property
-    def busy(self):
-        return self._state != "idle"
-
+    def busy(self): return self._state != "idle"
     def go(self, next_state, callback=None):
-        """Start a transition to next_state, optionally calling callback at peak."""
-        if self._state != "idle":
-            return  # ignore if already transitioning
-        self._next_state = next_state
-        self._callback   = callback
-        self._state      = "out"
-        self._alpha      = 0
-
+        if self._state != "idle": return
+        self._next_state = next_state; self._callback = callback
+        self._state = "out"; self._alpha = 0
     def update(self):
         if self._state == "out":
             self._alpha = min(255, self._alpha + 255 // self.FRAMES)
             if self._alpha >= 255:
-                self._alpha = 255
-                self._state = "in"
-                if self._callback:
-                    self._callback()
+                self._alpha = 255; self._state = "in"
+                if self._callback: self._callback()
         elif self._state == "in":
             self._alpha = max(0, self._alpha - 255 // self.FRAMES)
-            if self._alpha <= 0:
-                self._alpha = 0
-                self._state = "idle"
-                self._next_state = None
-
+            if self._alpha <= 0: self._alpha = 0; self._state = "idle"
     def draw(self, surface):
-        if self._state == "idle":
-            return
-        _fade_surf.set_alpha(self._alpha)
-        surface.blit(_fade_surf, (0, 0))
-
-    def consume_next(self):
-        """Return and clear the pending next_state when transition peaks."""
-        s = self._next_state
-        return s
-
+        if self._state == "idle": return
+        _fade_surf.set_alpha(self._alpha); surface.blit(_fade_surf, (0, 0))
 
 state        = "menu"
 current_mode = "classic"
@@ -82,7 +56,6 @@ last_stats   = {}
 lb_tab       = 0
 animator     = MenuAnimator()
 audio        = get_audio()
-_music_on    = False
 trans        = Transition()
 
 def _apply_volume():
@@ -100,22 +73,20 @@ def _toggle_fullscreen():
     _fade_surf = pygame.Surface((SW, SH))
     _fade_surf.fill((0, 0, 0))
 
+def _apply_state_change(next_state, pre_callback=None):
+    global state
+    if pre_callback: pre_callback()
+    state = next_state
+    if next_state == "game":
+        audio.stop_music()   # only stop when entering a game mode
+    else:
+        audio.start_music()  # resumes if stopped, skips if already playing
+
 def _go(next_state, pre_callback=None):
-    """Trigger a transition. pre_callback fires at peak black if provided."""
     trans.go(next_state, callback=lambda: _apply_state_change(next_state, pre_callback))
 
-def _apply_state_change(next_state, pre_callback=None):
-    global state, _music_on
-    if pre_callback:
-        pre_callback()
-    state = next_state
-    # music housekeeping at state change
-    if next_state == "game":
-        audio.stop_music(); _music_on = False
-    else:
-        if not _music_on:
-            audio.start_music(); _music_on = True
-
+# start music on launch
+audio.start_music()
 
 while True:
     ev_list = []
@@ -124,11 +95,8 @@ while True:
             pygame.quit(); sys.exit()
         ev_list.append(e)
 
-    # only process input when no transition is running
     if not trans.busy:
         if state == "menu":
-            if not _music_on:
-                audio.start_music(); _music_on = True
             animator.update()
             display.fill(C.BG)
             animator.draw(display)
@@ -141,10 +109,8 @@ while True:
                         lbl = btn.label.lower()
                         if lbl == "quit":
                             pygame.quit(); sys.exit()
-                        elif lbl == "leaderboard":
-                            _go("leaderboard")
-                        elif lbl == "settings":
-                            _go("settings")
+                        elif lbl == "leaderboard": _go("leaderboard")
+                        elif lbl == "settings":    _go("settings")
                         elif lbl in ("classic", "shrink zone", "hardcore"):
                             current_mode = lbl.replace(" zone", "")
                             _go("game")
@@ -152,19 +118,14 @@ while True:
         elif state == "game":
             last_score, last_stats = run_session(current_mode, display, clock)
             pygame.event.clear()
-            if last_score == -1:
-                _go("menu")
-            else:
-                _go("gameover")
+            _go("menu" if last_score == -1 else "gameover")
 
         elif state == "gameover":
-            if not _music_on:
-                audio.start_music(); _music_on = True
             over_buttons = draw_game_over(display, last_score, current_mode, last_stats)
             for ev in ev_list:
                 if ev.type == pygame.KEYDOWN:
-                    if ev.key == pygame.K_r:   _go("game")
-                    if ev.key in (pygame.K_m, pygame.K_ESCAPE): _go("menu")
+                    if ev.key == pygame.K_r:                         _go("game")
+                    if ev.key in (pygame.K_m, pygame.K_ESCAPE):      _go("menu")
                 for btn in over_buttons:
                     if btn.clicked(ev):
                         lbl = btn.label.lower()
@@ -173,25 +134,19 @@ while True:
                         elif "quit"   in lbl: pygame.quit(); sys.exit()
 
         elif state == "leaderboard":
-            if not _music_on:
-                audio.start_music(); _music_on = True
             lb_buttons, lb_tabs = draw_leaderboard(display, lb_tab)
             for ev in ev_list:
-                if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
-                    _go("menu")
+                if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE: _go("menu")
                 for i, tb in enumerate(lb_tabs):
                     if tb.clicked(ev): lb_tab = i
                 for btn in lb_buttons:
                     if btn.clicked(ev): _go("menu")
 
         elif state == "settings":
-            if not _music_on:
-                audio.start_music(); _music_on = True
             cfg = load_cfg()
             btns = draw_settings(display, cfg)
             for ev in ev_list:
-                if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
-                    _go("menu")
+                if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE: _go("menu")
                 for btn in btns["back"]:
                     if btn.clicked(ev): _go("menu")
                 for btn in btns["toggle_fs"]:
@@ -212,15 +167,12 @@ while True:
                             save_cfg(cfg); _apply_volume()
                 from trails import set_active
                 for btn, trail_id, locked in btns["trails"]:
-                    if not locked and btn.clicked(ev):
-                        set_active(trail_id)
+                    if not locked and btn.clicked(ev): set_active(trail_id)
     else:
-        # during transition: keep drawing current state behind the fade
+        # keep drawing current state behind the fade
         if state == "menu":
-            animator.update()
-            display.fill(C.BG)
-            animator.draw(display)
-            draw_main_menu(display)
+            animator.update(); display.fill(C.BG)
+            animator.draw(display); draw_main_menu(display)
         elif state == "gameover":
             draw_game_over(display, last_score, current_mode, last_stats)
         elif state == "leaderboard":

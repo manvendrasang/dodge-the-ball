@@ -185,8 +185,9 @@ class GameSession:
         for b in bashed:
             self.balls.remove(b)
             self._spawn_bash_burst(b.x, b.y, b.color, b.r)
-            # respawn a new ball so count stays consistent
-            self.balls.append(_make_ball(self.score, self.mode))
+            # only respawn if the current score still warrants this many balls
+            if _should_add_ball(self.balls, self.score, self.mode):
+                self.balls.append(_make_ball(self.score, self.mode))
 
         # tick bash particles
         for p in self._bash_particles:
