@@ -157,6 +157,23 @@ class Target:
         cy = self.y + self.h / 2
         return math.hypot(px - cx, py - cy) <= p_radius + self.w
 
+    def move_toward(self, px, py, speed, zone_rect=None):
+        """Pull target center toward (px, py) at given speed."""
+        cx = self.x + self.w / 2
+        cy = self.y + self.h / 2
+        dx = px - cx
+        dy = py - cy
+        dist = math.hypot(dx, dy)
+        if dist < 2:
+            return
+        step = min(speed, dist)
+        self.x += (dx / dist) * step
+        self.y += (dy / dist) * step
+        # clamp inside zone
+        bounds = zone_rect if zone_rect else pygame.Rect(0, 0, C.WIDTH, C.HEIGHT)
+        self.x = max(bounds.left, min(bounds.right  - self.w, self.x))
+        self.y = max(bounds.top,  min(bounds.bottom - self.h, self.y))
+
 
 class PowerUp:
     RADIUS = 14
@@ -168,7 +185,7 @@ class PowerUp:
         m = self.RADIUS + 20
         self.x     = random.randint(bounds.left + m, bounds.right  - m)
         self.y     = random.randint(bounds.top  + m, bounds.bottom - m)
-        self.kind  = random.choice([PU_SLOWMO, PU_SHIELD, PU_MULTI30, PU_MULTI90, PU_GHOST])
+        self.kind  = random.choice([PU_SLOWMO, PU_SHIELD, PU_MULTI30, PU_MULTI90, PU_GHOST, PU_MAGNET])
         self.color = PU_COLOR[self.kind]
         self.alive = True
         self._pulse = 0

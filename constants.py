@@ -42,6 +42,7 @@ PU_SHIELD  = "shield"
 PU_MULTI30 = "multi30"
 PU_MULTI90 = "multi90"
 PU_GHOST   = "ghost"
+PU_MAGNET  = "magnet"
 
 PU_COLOR = {
     PU_SLOWMO:  CYAN,
@@ -49,6 +50,7 @@ PU_COLOR = {
     PU_MULTI30: YELLOW,
     PU_MULTI90: ORANGE,
     PU_GHOST:   (200, 200, 255),
+    PU_MAGNET:  PINK,
 }
 PU_LABEL = {
     PU_SLOWMO:  "SLOW",
@@ -56,6 +58,7 @@ PU_LABEL = {
     PU_MULTI30: "x2 30s",
     PU_MULTI90: "x2 90s",
     PU_GHOST:   "GHOST",
+    PU_MAGNET:  "MAGNET",
 }
 PU_DURATION = {
     PU_SLOWMO:  8  * FPS,
@@ -63,6 +66,7 @@ PU_DURATION = {
     PU_MULTI30: 30 * FPS,
     PU_MULTI90: 90 * FPS,
     PU_GHOST:   5  * FPS,
+    PU_MAGNET:  6  * FPS,
 }
 PU_SPAWN_INTERVAL = 15 * FPS
 PU_CHANCE         = 0.45

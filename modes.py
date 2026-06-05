@@ -215,6 +215,12 @@ class GameSession:
             n["life"] -= 1
         self._unlock_notif = [n for n in self._unlock_notif if n["life"] > 0]
 
+        # magnet: pull target toward cursor
+        if PU_MAGNET in self.active_pu:
+            frac  = self.active_pu[PU_MAGNET] / PU_DURATION[PU_MAGNET]
+            speed = 4.5 + (1.0 - frac) * 3.5  # accelerates as duration runs out
+            self.target.move_toward(ppos[0], ppos[1], speed, zone)
+
         # target
         if self.target.player_overlap(*ppos, P_RADIUS):
             get_audio().play("collect")
@@ -364,6 +370,30 @@ class GameSession:
         for pu in self.powerups:
             pu.draw(game_surf)
         self.target.draw(game_surf)
+
+        # magnet beam: dashed pink line from target center to player
+        if PU_MAGNET in self.active_pu:
+            frac    = self.active_pu[PU_MAGNET] / PU_DURATION[PU_MAGNET]
+            alpha   = int(180 * frac)
+            mpos    = pygame.mouse.get_pos()
+            tcx     = int(self.target.x + self.target.w / 2)
+            tcy     = int(self.target.y + self.target.h / 2)
+            beam_s  = pygame.Surface((C.WIDTH, C.HEIGHT), pygame.SRCALPHA)
+            dx, dy  = mpos[0] - tcx, mpos[1] - tcy
+            dist    = math.hypot(dx, dy)
+            if dist > 1:
+                steps = int(dist / 12)
+                for i in range(0, steps, 2):
+                    t0 = i / max(steps, 1)
+                    t1 = min((i + 1) / max(steps, 1), 1.0)
+                    x0 = int(tcx + dx * t0); y0 = int(tcy + dy * t0)
+                    x1 = int(tcx + dx * t1); y1 = int(tcy + dy * t1)
+                    pygame.draw.line(beam_s, (*PINK, alpha), (x0, y0), (x1, y1), 2)
+            game_surf.blit(beam_s, (0, 0))
+            ring_r = int(self.target.w + 6 + 4 * math.sin(pygame.time.get_ticks() * 0.01))
+            ring_s = pygame.Surface((ring_r*2, ring_r*2), pygame.SRCALPHA)
+            pygame.draw.circle(ring_s, (*PINK, alpha), (ring_r, ring_r), ring_r, 2)
+            game_surf.blit(ring_s, (tcx - ring_r, tcy - ring_r))
 
         # draw trail then player
         self._draw_trail(game_surf)

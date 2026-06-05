@@ -279,6 +279,10 @@ def draw_hud(surface, score, mode, active_pus, lives=None, shield=False, combo=0
         gh = C.FONT_SMALL.render("◌  GHOST ACTIVE", True, (200, 200, 255))
         offset = 32 if shield else 12
         surface.blit(gh, (C.WIDTH//2 - gh.get_width()//2, offset))
+    if PU_MAGNET in active_pus:
+        mg = C.FONT_SMALL.render("◈  MAGNET ACTIVE", True, PINK)
+        top = [shield, PU_GHOST in active_pus].count(True)
+        surface.blit(mg, (C.WIDTH//2 - mg.get_width()//2, 12 + top * 22))
     # combo indicator - top right below mode label
     if combo > 1:
         import math
