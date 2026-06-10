@@ -13,6 +13,7 @@ from ui import draw_hud, draw_pause
 from audio import get_audio
 from trails import get_color_fn, get_active, check_and_unlock, trail_alpha
 from settings import get_player_color
+from achievements import check_and_unlock as check_achievements
 
 def _combo_color(combo):
     """Return a neon color that escalates with combo level."""
@@ -97,6 +98,7 @@ class GameSession:
         self.stat_peak_combo     = 0   # highest combo reached
         self.stat_shrinks        = 0   # zone shrink events (shrink mode)
         self.stat_walls_survived = 0   # walls that expired without killing (hardcore)
+        self.stat_used_extra_life = False  # used the extra life in hardcore
         # level system
         self.level         = 1
         self._last_level   = 1
@@ -150,6 +152,7 @@ class GameSession:
             return
         if self.lives > 0:
             self.lives -= 1
+            self.stat_used_extra_life = True
             self.effects.trigger_death()
             return
         self.dead = True
@@ -538,12 +541,16 @@ def run_session(mode, display, clock) -> int:
     pygame.mouse.set_visible(True)
     submit_score(mode, session.score)
     stats = {
-        "time_s":       session.stat_frames // FPS,
-        "balls_dodged": session.stat_balls_dodged,
-        "powerups":     session.stat_powerups,
-        "peak_combo":   session.stat_peak_combo,
-        "shrinks":      session.stat_shrinks,
-        "walls":        session.stat_walls_survived,
-        "level":        session.level,
+        "score":           session.score,
+        "time_s":          session.stat_frames // FPS,
+        "balls_dodged":    session.stat_balls_dodged,
+        "powerups":        session.stat_powerups,
+        "peak_combo":      session.stat_peak_combo,
+        "shrinks":         session.stat_shrinks,
+        "walls":           session.stat_walls_survived,
+        "level":           session.level,
+        "used_extra_life": session.stat_used_extra_life,
     }
+    new_ach = check_achievements(stats, mode)
+    stats["new_achievements"] = new_ach
     return session.score, stats

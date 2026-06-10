@@ -1,5 +1,5 @@
 # pylint: disable=missing-module-docstring, missing-function-docstring, global-statement, unused-wildcard-import, line-too-long, superfluous-parens
-# pylint: disable=missing-class-docstring, no-member, no-name-in-module, multiple-statements, unused-variable, unused-import
+# pylint: disable=missing-class-docstring, no-member, no-name-in-module, multiple-statements, unused-variable, unused-import, redefined-outer-name
 
 import pygame
 import constants as C
@@ -65,9 +65,10 @@ def draw_main_menu(surface):
     y0 = max(180, C.HEIGHT//2 - total_h//2 + 30)
     buttons = [
         Button((cx, y0,              bw, bh), "Play",        (20,90,40),  (40,210,90),  WHITE),
-        Button((cx, y0+bh+gap,       bw, bh), "Leaderboard", (30,34,70),  BTN_LEADER_H, CYAN),
-        Button((cx, y0+(bh+gap)*2,   bw, bh), "Settings",    (25,40,60),  (40,100,160), WHITE),
-        Button((cx, y0+(bh+gap)*3+14,bw, bh), "Quit",        BTN_QUIT,    BTN_QUIT_H,   RED),
+        Button((cx, y0+bh+gap,       bw, bh), "Profile",     (50,20,80),  (120,40,200), WHITE),
+        Button((cx, y0+(bh+gap)*2,   bw, bh), "Leaderboard", (30,34,70),  BTN_LEADER_H, CYAN),
+        Button((cx, y0+(bh+gap)*3,   bw, bh), "Settings",    (25,40,60),  (40,100,160), WHITE),
+        Button((cx, y0+(bh+gap)*4+14,bw, bh), "Quit",        BTN_QUIT,    BTN_QUIT_H,   RED),
     ]
     for b in buttons: b.draw(surface)
     # personal bests — right side, vertically aligned with button group
@@ -187,6 +188,30 @@ def draw_game_over(surface, score, mode, stats=None):
         panel_bottom = py_ + ph + 18
     else:
         panel_bottom = 340
+
+    # newly unlocked achievements panel
+    new_ach = stats.get("new_achievements", []) if stats else []
+    if new_ach:
+        ach_pw = 520
+        ach_ph = 18 + len(new_ach) * 40
+        ach_px = C.WIDTH//2 - ach_pw//2
+        ach_py = panel_bottom
+        _panel(surface, pygame.Rect(ach_px, ach_py, ach_pw, ach_ph), 220)
+        hdr = C.FONT_SMALL.render("ACHIEVEMENTS UNLOCKED", True, YELLOW)
+        surface.blit(hdr, (ach_px + 18, ach_py + 6))
+        for i, ach in enumerate(new_ach):
+            ay  = ach_py + 26 + i * 40
+            ico = C.FONT_HUD.render(ach["icon"], True, YELLOW)
+            nm  = C.FONT_HUD.render(ach["name"], True, WHITE)
+            dsc = C.FONT_SMALL.render(ach["desc"], True, DIM)
+            surface.blit(ico, (ach_px + 14, ay))
+            surface.blit(nm,  (ach_px + 50, ay))
+            surface.blit(dsc, (ach_px + 50, ay + 20))
+            if i < len(new_ach) - 1:
+                pygame.draw.line(surface, (35,37,60),
+                                (ach_px+14, ay+38), (ach_px+ach_pw-14, ay+38))
+        panel_bottom = ach_py + ach_ph + 14
+
     bw, bh, gap = 240, 46, 10
     cx  = C.WIDTH//2 - bw//2
     buttons = [
@@ -504,3 +529,151 @@ def draw_settings(surface, cfg: dict) -> dict:
     bk.draw(surface)
     result["back"].append(bk)
     return result
+
+
+def draw_profile(surface, active_tab: int) -> tuple:
+    """
+    Two-tab profile screen.
+    active_tab: 0 = Profile, 1 = Achievements
+    Returns (tab_buttons, back_button)
+    """
+    from trails import TRAIL_DEFS, get_unlocked as get_unlocked_trails
+    from achievements import get_all_for_display, ACHIEVEMENTS
+    from scores import get_scores
+
+    surface.fill(BG)
+    for x in range(0, C.WIDTH, 60):
+        pygame.draw.line(surface, (18, 20, 34), (x, 0), (x, C.HEIGHT))
+    for y in range(0, C.HEIGHT, 60):
+        pygame.draw.line(surface, (18, 20, 34), (0, y), (C.WIDTH, y))
+
+    title = C.FONT_BIG.render("PROFILE", True, PURPLE)
+    surface.blit(title, (C.WIDTH//2 - title.get_width()//2, 20))
+
+    # tabs
+    tab_labels = ["Profile", "Achievements"]
+    tab_w, tab_h = 240, 44
+    tab_start = C.WIDTH//2 - (tab_w * 2 + 10)//2
+    tab_buttons = []
+    for i, lbl in enumerate(tab_labels):
+        tx   = tab_start + i * (tab_w + 10)
+        active = (i == active_tab)
+        bg   = PURPLE if active else (40, 22, 60)
+        hov  = (220, 100, 255)
+        tc   = DARK if active else WHITE
+        b    = Button((tx, 72, tab_w, tab_h), lbl, bg, hov, tc)
+        b.draw(surface)
+        tab_buttons.append(b)
+
+    content_y = 130
+    content_h = C.HEIGHT - content_y - 80
+    pw        = C.WIDTH - 120
+    px        = 60
+
+    if active_tab == 0:
+        # PROFILE TAB: high scores + unlocked trails
+        # left half: scores per mode
+        half_w = pw // 2 - 10
+        _panel(surface, pygame.Rect(px, content_y, half_w, content_h))
+        sh = C.FONT_HUD.render("HIGH SCORES", True, CYAN)
+        surface.blit(sh, (px + 20, content_y + 14))
+        sy = content_y + 52
+        for mode in MODES:
+            mode_col = {"classic": CYAN, "shrink": PURPLE, "hardcore": RED}.get(mode, WHITE)
+            mh = C.FONT_HUD.render(mode.upper(), True, mode_col)
+            surface.blit(mh, (px + 20, sy))
+            sy += 32
+            entries = get_scores(mode)
+            if not entries:
+                empty = C.FONT_SMALL.render("No scores yet", True, DIM)
+                surface.blit(empty, (px + 36, sy))
+                sy += 28
+            else:
+                for rank, entry in enumerate(entries[:5], 1):
+                    sc = entry[0] if isinstance(entry, (list, tuple)) else entry
+                    ts = entry[1] if isinstance(entry, (list, tuple)) else ""
+                    rc = YELLOW if rank == 1 else (WHITE if rank <= 3 else DIM)
+                    row = C.FONT_SMALL.render(f"#{rank}  {sc:<6}  {ts}", True, rc)
+                    surface.blit(row, (px + 36, sy))
+                    sy += 26
+            sy += 12
+            pygame.draw.line(surface, (35,37,60), (px+14, sy), (px+half_w-14, sy))
+            sy += 14
+
+        # right half: trail styles
+        rx = px + half_w + 20
+        _panel(surface, pygame.Rect(rx, content_y, half_w, content_h))
+        th = C.FONT_HUD.render("TRAIL STYLES", True, CYAN)
+        surface.blit(th, (rx + 20, content_y + 14))
+        unlocked_trails = set(get_unlocked_trails())
+        from trails import get_color_fn
+        ty = content_y + 52
+        for td in TRAIL_DEFS:
+            locked  = td["id"] not in unlocked_trails
+            row_h   = 52
+            # trail color preview strip
+            strip_x = rx + 20
+            strip_y = ty + 16
+            fn      = get_color_fn(td["id"]) if not locked else None
+            for xi in range(120):
+                frac = xi / 119
+                if locked:
+                    v   = int(40 + frac * 30)
+                    col = (v, v, v)
+                else:
+                    col = fn(frac, 500)
+                pygame.draw.line(surface, col, (strip_x + xi, strip_y), (strip_x + xi, strip_y + 10))
+            # name
+            name_col = WHITE if not locked else (60, 62, 80)
+            nm  = C.FONT_HUD.render(td["name"], True, name_col)
+            surface.blit(nm, (strip_x + 130, ty + 10))
+            if locked:
+                lk = C.FONT_SMALL.render(f"Unlock @ score {td['unlock']}", True, DIM)
+                surface.blit(lk, (strip_x + 130, ty + 32))
+            else:
+                ul = C.FONT_SMALL.render("Unlocked ✓", True, GREEN)
+                surface.blit(ul, (strip_x + 130, ty + 32))
+            ty += row_h + 6
+
+    else:
+        # ACHIEVEMENTS TAB
+        all_ach = get_all_for_display()
+        unlocked_count = sum(1 for a in all_ach if a["unlocked"])
+        prog = C.FONT_HUD.render(f"{unlocked_count} / {len(all_ach)} unlocked", True, YELLOW)
+        surface.blit(prog, (C.WIDTH//2 - prog.get_width()//2, content_y - 2))
+
+        # grid: 2 columns
+        col_w   = pw // 2 - 10
+        cols    = 2
+        item_h  = 72
+        margin  = 10
+        for i, ach in enumerate(all_ach):
+            col_idx = i % cols
+            row_idx = i // cols
+            ax = px + col_idx * (col_w + 20)
+            ay = content_y + 26 + row_idx * (item_h + margin)
+            if ay + item_h > C.HEIGHT - 80:
+                break  # don't overflow screen
+            locked = not ach["unlocked"]
+            bg_col = (22, 18, 38) if locked else (32, 28, 55)
+            pygame.draw.rect(surface, bg_col, (ax, ay, col_w, item_h), border_radius=8)
+            border = (40, 40, 60) if locked else PURPLE
+            pygame.draw.rect(surface, border, (ax, ay, col_w, item_h), 2, border_radius=8)
+            if locked:
+                # greyscale icon + locked label
+                ico = C.FONT_BIG.render("🔒", True, (60, 62, 80))
+                surface.blit(ico, (ax + 12, ay + item_h//2 - ico.get_height()//2))
+                nm  = C.FONT_HUD.render(ach["name"], True, (70, 72, 90))
+                dsc = C.FONT_SMALL.render(ach["desc"], True, (50, 52, 70))
+            else:
+                ico = C.FONT_BIG.render(ach["icon"], True, YELLOW)
+                surface.blit(ico, (ax + 12, ay + item_h//2 - ico.get_height()//2))
+                nm  = C.FONT_HUD.render(ach["name"], True, WHITE)
+                dsc = C.FONT_SMALL.render(ach["desc"], True, (160, 162, 190))
+            surface.blit(nm,  (ax + 58, ay + 12))
+            surface.blit(dsc, (ax + 58, ay + 38))
+
+    back = Button((C.WIDTH//2 - 120, C.HEIGHT - 62, 240, 46),
+                "Back to Menu", (30,34,70), BTN_LEADER_H, CYAN)
+    back.draw(surface)
+    return tab_buttons, back

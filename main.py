@@ -1,11 +1,12 @@
 # pylint: disable=missing-module-docstring, missing-function-docstring, global-statement, unused-wildcard-import, line-too-long, invalid-name
-# pylint: disable=missing-class-docstring, no-member, unused-import, unused-argument, no-name-in-module, multiple-statements
+# pylint: disable=missing-class-docstring, no-member, unused-import, unused-argument, no-name-in-module, multiple-statements, redefined-outer-name
 
 import sys
+import math
 import pygame
 import constants as C
 from constants import init_fonts, set_resolution, MODES, FPS
-from ui import draw_main_menu, draw_mode_select, draw_game_over, draw_leaderboard, draw_settings
+from ui import draw_main_menu, draw_mode_select, draw_game_over, draw_leaderboard, draw_settings, draw_profile
 from modes import run_session
 from menu_anim import MenuAnimator
 from audio import get_audio
@@ -24,6 +25,53 @@ init_fonts()
 
 _fade_surf = pygame.Surface((SW, SH))
 _fade_surf.fill((0, 0, 0))
+
+# achievement popup queue
+_ach_popups = []   # list of {"ach": dict, "life": int, "max_life": int}
+_ACH_POP_LIFE = 4 * FPS  # 4 seconds each
+
+def _queue_ach_popups(new_ach: list):
+    for ach in new_ach:
+        _ach_popups.append({"ach": ach, "life": _ACH_POP_LIFE, "max_life": _ACH_POP_LIFE})
+
+def _draw_ach_popups(surface):
+    """Draw stacked achievement popups at top-center of screen."""
+    if not _ach_popups:
+        return
+    pop_w, pop_h = 420, 56
+    for i, pop in enumerate(_ach_popups[:3]):
+        frac  = pop["life"] / pop["max_life"]
+        # slide in from top
+        slide = max(0.0, 1.0 - frac * 8)        # 0→1 means offscreen; snaps in fast
+        alpha = int(255 * min(1.0, frac * 6))    # fades out in last ~0.17s
+        py_   = int(-pop_h * slide) + 12 + i * (pop_h + 6)
+        px_   = C.WIDTH // 2 - pop_w // 2
+        # panel
+        ps = pygame.Surface((pop_w, pop_h), pygame.SRCALPHA)
+        ps.fill((30, 20, 50, int(220 * min(1.0, frac * 6))))
+        pygame.draw.rect(ps, (*C.PURPLE, alpha), (0, 0, pop_w, pop_h), 2, border_radius=8)
+        surface.blit(ps, (px_, py_))
+        # ping dot
+        ping_r = 6
+        ping_a = int(255 * abs(math.sin(pygame.time.get_ticks() * 0.006)))
+        pd = pygame.Surface((ping_r*2, ping_r*2), pygame.SRCALPHA)
+        pygame.draw.circle(pd, (*C.YELLOW, ping_a), (ping_r, ping_r), ping_r)
+        surface.blit(pd, (px_ + pop_w - ping_r*2 - 8, py_ + pop_h//2 - ping_r))
+        # icon + text
+        ach  = pop["ach"]
+        ico  = C.FONT_HUD.render(ach["icon"], True, C.YELLOW)
+        nm   = C.FONT_HUD.render(ach["name"], True, C.WHITE)
+        tag  = C.FONT_SMALL.render("ACHIEVEMENT UNLOCKED", True, C.PURPLE)
+        ico.set_alpha(alpha); nm.set_alpha(alpha); tag.set_alpha(alpha)
+        surface.blit(ico, (px_ + 12, py_ + pop_h//2 - ico.get_height()//2))
+        surface.blit(tag, (px_ + 50, py_ + 6))
+        surface.blit(nm,  (px_ + 50, py_ + 24))
+
+def _tick_ach_popups():
+    for p in _ach_popups:
+        p["life"] -= 1
+    while _ach_popups and _ach_popups[0]["life"] <= 0:
+        _ach_popups.pop(0)
 
 class Transition:
     FRAMES = 18
@@ -54,6 +102,7 @@ current_mode = "classic"
 last_score   = 0
 last_stats   = {}
 lb_tab       = 0
+profile_tab  = 0
 animator     = MenuAnimator()
 audio        = get_audio()
 trans        = Transition()
@@ -110,14 +159,14 @@ while True:
                         if   lbl == "quit":        pygame.quit(); sys.exit()
                         elif lbl == "leaderboard": _go("leaderboard")
                         elif lbl == "settings":    _go("settings")
+                        elif lbl == "profile":     _go("profile")
                         elif lbl == "play":        _go("mode_select")
 
         elif state == "mode_select":
             _draw_menu_bg()
             mode_buttons, back_btn = draw_mode_select(display)
             for ev in ev_list:
-                if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
-                    _go("menu")
+                if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE: _go("menu")
                 if back_btn.clicked(ev): _go("menu")
                 for btn in mode_buttons:
                     if btn.clicked(ev):
@@ -127,10 +176,15 @@ while True:
         elif state == "game":
             last_score, last_stats = run_session(current_mode, display, clock)
             pygame.event.clear()
+            new_ach = last_stats.get("new_achievements", [])
+            if new_ach:
+                _queue_ach_popups(new_ach)
             _go("menu" if last_score == -1 else "gameover")
 
         elif state == "gameover":
             over_buttons = draw_game_over(display, last_score, current_mode, last_stats)
+            _tick_ach_popups()
+            _draw_ach_popups(display)
             for ev in ev_list:
                 if ev.type == pygame.KEYDOWN:
                     if ev.key == pygame.K_r:                    _go("game")
@@ -150,6 +204,14 @@ while True:
                     if tb.clicked(ev): lb_tab = i
                 for btn in lb_buttons:
                     if btn.clicked(ev): _go("menu")
+
+        elif state == "profile":
+            tab_btns, back_btn = draw_profile(display, profile_tab)
+            for ev in ev_list:
+                if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE: _go("menu")
+                if back_btn.clicked(ev): _go("menu")
+                for i, tb in enumerate(tab_btns):
+                    if tb.clicked(ev): profile_tab = i
 
         elif state == "settings":
             cfg = load_cfg()
@@ -179,14 +241,18 @@ while True:
                     if not locked and btn.clicked(ev): set_active(trail_id)
 
     else:
-        # keep drawing current state behind the fade
         if state in ("menu", "mode_select"):
             _draw_menu_bg()
-            if state == "menu":       draw_main_menu(display)
-            else:                     draw_mode_select(display)
-        elif state == "gameover":     draw_game_over(display, last_score, current_mode, last_stats)
-        elif state == "leaderboard":  draw_leaderboard(display, lb_tab)
-        elif state == "settings":     draw_settings(display, load_cfg())
+            if state == "menu":  draw_main_menu(display)
+            else:                draw_mode_select(display)
+        elif state == "gameover":    draw_game_over(display, last_score, current_mode, last_stats)
+        elif state == "leaderboard": draw_leaderboard(display, lb_tab)
+        elif state == "profile":     draw_profile(display, profile_tab)
+        elif state == "settings":    draw_settings(display, load_cfg())
+
+    # always tick and draw popups on top of everything
+    _tick_ach_popups()
+    _draw_ach_popups(display)
 
     trans.update()
     trans.draw(display)
