@@ -1,5 +1,6 @@
-# pylint: disable=missing-module-docstring, missing-function-docstring, global-statement, unused-wildcard-import, line-too-long, superfluous-parens
-# pylint: disable=missing-class-docstring, no-member, no-name-in-module, multiple-statements, unused-variable, unused-import, redefined-outer-name
+# pylint: disable=missing-module-docstring, missing-function-docstring, global-statement, unused-wildcard-import, line-too-long, superfluous-parens, import-outside-toplevel
+# pylint: disable=missing-class-docstring, no-member, no-name-in-module, multiple-statements, unused-variable, unused-import, redefined-outer-name, wildcard-import
+# pylint: disable=reimported
 
 import pygame
 import constants as C
@@ -189,27 +190,25 @@ def draw_game_over(surface, score, mode, stats=None):
     else:
         panel_bottom = 340
 
-    # newly unlocked achievements panel
+    # newly unlocked achievements — compact single-line banner
     new_ach = stats.get("new_achievements", []) if stats else []
     if new_ach:
         ach_pw = 520
-        ach_ph = 18 + len(new_ach) * 40
+        ach_ph = 44
         ach_px = C.WIDTH//2 - ach_pw//2
         ach_py = panel_bottom
         _panel(surface, pygame.Rect(ach_px, ach_py, ach_pw, ach_ph), 220)
-        hdr = C.FONT_SMALL.render("ACHIEVEMENTS UNLOCKED", True, YELLOW)
-        surface.blit(hdr, (ach_px + 18, ach_py + 6))
-        for i, ach in enumerate(new_ach):
-            ay  = ach_py + 26 + i * 40
-            ico = C.FONT_HUD.render(ach["icon"], True, YELLOW)
-            nm  = C.FONT_HUD.render(ach["name"], True, WHITE)
-            dsc = C.FONT_SMALL.render(ach["desc"], True, DIM)
-            surface.blit(ico, (ach_px + 14, ay))
-            surface.blit(nm,  (ach_px + 50, ay))
-            surface.blit(dsc, (ach_px + 50, ay + 20))
-            if i < len(new_ach) - 1:
-                pygame.draw.line(surface, (35,37,60),
-                                (ach_px+14, ay+38), (ach_px+ach_pw-14, ay+38))
+        # show up to 3 icons, then "+N more"
+        icons_shown = new_ach[:3]
+        icon_strs   = " ".join(a["icon"] for a in icons_shown)
+        if len(new_ach) == 1:
+            txt = f"{icon_strs}  ACHIEVEMENT UNLOCKED: {new_ach[0]['name']}"
+        else:
+            extra = len(new_ach) - len(icons_shown)
+            suffix = f"  +{extra} more" if extra > 0 else ""
+            txt = f"{icon_strs}  {len(new_ach)} ACHIEVEMENTS UNLOCKED{suffix}"
+        lbl = C.FONT_HUD.render(txt, True, YELLOW)
+        surface.blit(lbl, (C.WIDTH//2 - lbl.get_width()//2, ach_py + ach_ph//2 - lbl.get_height()//2))
         panel_bottom = ach_py + ach_ph + 14
 
     bw, bh, gap = 240, 46, 10
