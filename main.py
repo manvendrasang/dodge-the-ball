@@ -4,6 +4,7 @@
 import sys
 import math
 import pygame
+from attract import AttractMode
 import constants as C
 from constants import init_fonts, set_resolution, MODES, FPS
 from ui import draw_main_menu, draw_mode_select, draw_game_over, draw_leaderboard, draw_settings, draw_profile
@@ -102,8 +103,12 @@ current_mode = "classic"
 last_score   = 0
 last_stats   = {}
 lb_tab       = 0
+lb_period    = "all"
 profile_tab  = 0
 animator     = MenuAnimator()
+attract      = AttractMode()
+_idle_frames = 0
+_IDLE_LIMIT  = 8 * FPS  # 8 seconds
 audio        = get_audio()
 trans        = Transition()
 
@@ -149,6 +154,17 @@ while True:
 
         if state == "menu":
             _draw_menu_bg()
+            # idle detection — any input resets the timer
+            had_input = any(ev.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN)
+                            for ev in ev_list)
+            if had_input:
+                _idle_frames = 0
+            else:
+                _idle_frames += 1
+            if _idle_frames >= _IDLE_LIMIT:
+                attract.update()
+                attract.draw(display)
+                attract.draw_label(display)
             menu_buttons = draw_main_menu(display)
             for ev in ev_list:
                 if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
@@ -161,6 +177,8 @@ while True:
                         elif lbl == "settings":    _go("settings")
                         elif lbl == "profile":     _go("profile")
                         elif lbl == "play":        _go("mode_select")
+                        if lbl != "":  # any click resets idle and ends attract
+                            _idle_frames = 0
 
         elif state == "mode_select":
             _draw_menu_bg()
@@ -197,11 +215,13 @@ while True:
                         elif "quit"   in lbl: pygame.quit(); sys.exit()
 
         elif state == "leaderboard":
-            lb_buttons, lb_tabs = draw_leaderboard(display, lb_tab)
+            lb_buttons, lb_tabs, lb_periods = draw_leaderboard(display, lb_tab, lb_period)
             for ev in ev_list:
                 if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE: _go("menu")
                 for i, tb in enumerate(lb_tabs):
                     if tb.clicked(ev): lb_tab = i
+                for i, pb in enumerate(lb_periods):
+                    if pb.clicked(ev): lb_period = ["all", "today"][i]
                 for btn in lb_buttons:
                     if btn.clicked(ev): _go("menu")
 
@@ -246,7 +266,7 @@ while True:
             if state == "menu":  draw_main_menu(display)
             else:                draw_mode_select(display)
         elif state == "gameover":    draw_game_over(display, last_score, current_mode, last_stats)
-        elif state == "leaderboard": draw_leaderboard(display, lb_tab)
+        elif state == "leaderboard": draw_leaderboard(display, lb_tab, lb_period)
         elif state == "profile":     draw_profile(display, profile_tab)
         elif state == "settings":    draw_settings(display, load_cfg())
 

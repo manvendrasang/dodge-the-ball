@@ -223,14 +223,30 @@ def draw_game_over(surface, score, mode, stats=None):
     return buttons
 
 
-def draw_leaderboard(surface, active_tab_idx):
+def draw_leaderboard(surface, active_tab_idx, period="all"):
+    """period: 'all' or 'today'. Returns (back_buttons, mode_tabs, period_tabs)."""
+    from scores import get_daily_scores
     surface.fill(BG)
     for x in range(0, C.WIDTH, 60):
         pygame.draw.line(surface, (20, 22, 36), (x, 0), (x, C.HEIGHT))
     for y in range(0, C.HEIGHT, 60):
         pygame.draw.line(surface, (20, 22, 36), (0, y), (C.WIDTH, y))
     t = C.FONT_BIG.render("LEADERBOARD", True, CYAN)
-    surface.blit(t, (C.WIDTH//2 - t.get_width()//2, 24))
+    surface.blit(t, (C.WIDTH//2 - t.get_width()//2, 18))
+
+    # period toggle (All-Time / Today)
+    per_w, per_h = 160, 38
+    per_start = C.WIDTH//2 - per_w
+    period_tabs = []
+    for i, (lbl, key) in enumerate([("All-Time", "all"), ("Today", "today")]):
+        px_ = per_start + i * per_w
+        active = (period == key)
+        b = Button((px_, 64, per_w, per_h), lbl,
+                (50,50,80) if active else (26,28,46),
+                (90,90,140), WHITE if active else DIM)
+        b.draw(surface)
+        period_tabs.append(b)
+
     tab_labels = ["Classic", "Shrink Zone", "Hardcore"]
     tab_fg     = [CYAN, PURPLE, RED]
     tab_bg     = [(20,60,120), (50,20,90), (90,20,20)]
@@ -240,17 +256,19 @@ def draw_leaderboard(surface, active_tab_idx):
     for i, (lbl, fg, bg) in enumerate(zip(tab_labels, tab_fg, tab_bg)):
         tx = tab_start + i*(tab_w+10)
         active = (i == active_tab_idx)
-        b = Button((tx, 86, tab_w, tab_h), lbl,
+        b = Button((tx, 116, tab_w, tab_h), lbl,
                 fg if active else bg,
                 fg,
                 DARK if active else WHITE)
         b.draw(surface)
         tab_buttons.append(b)
-    mode    = MODES[active_tab_idx]
-    entries = get_scores(mode)
-    # entries are now (score, timestamp) tuples or plain ints for backward compat
-    _panel(surface, pygame.Rect(C.WIDTH//2 - 320, 148, 640, C.HEIGHT - 220))
-    y = 164
+    mode = MODES[active_tab_idx]
+    if period == "today":
+        entries = get_daily_scores(mode)
+    else:
+        entries = get_scores(mode)
+    _panel(surface, pygame.Rect(C.WIDTH//2 - 320, 176, 640, C.HEIGHT - 250))
+    y = 192
     for rank, entry in enumerate(entries, 1):
         if isinstance(entry, (list, tuple)):
             sc, ts = entry[0], entry[1]
@@ -259,8 +277,6 @@ def draw_leaderboard(surface, active_tab_idx):
         if rank == 1:   col = YELLOW
         elif rank <= 3: col = (200, 200, 255)
         else:           col = DIM
-        medals = {1:"🥇", 2:"🥈", 3:"🥉"}
-        medal = medals.get(rank, "") if rank <= 3 else ""
         rank_txt = C.FONT_HUD.render(f"#{rank:>2}", True, col)
         sc_txt   = C.FONT_HUD.render(str(sc), True, WHITE)
         ts_txt   = C.FONT_SMALL.render(ts, True, (80, 84, 110))
@@ -271,12 +287,13 @@ def draw_leaderboard(surface, active_tab_idx):
                         (C.WIDTH//2 - 300, y + 34), (C.WIDTH//2 + 300, y + 34))
         y += 38
     if not entries:
-        empty = C.FONT_HUD.render("No scores recorded yet", True, DIM)
-        surface.blit(empty, (C.WIDTH//2 - empty.get_width()//2, 280))
+        msg = "No scores recorded today" if period == "today" else "No scores recorded yet"
+        empty = C.FONT_HUD.render(msg, True, DIM)
+        surface.blit(empty, (C.WIDTH//2 - empty.get_width()//2, 240))
     bk = Button((C.WIDTH//2 - 120, C.HEIGHT - 62, 240, 46),
                 "Back to Menu", (30,34,70), BTN_LEADER_H, CYAN)
     bk.draw(surface)
-    return [bk], tab_buttons
+    return [bk], tab_buttons, period_tabs
 
 
 def draw_hud(surface, score, mode, active_pus, lives=None, shield=False, combo=0, combo_timer=0, level=1):
